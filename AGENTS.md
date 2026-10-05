@@ -9,7 +9,6 @@ notebooks/<kebab-slug>/
   README.md              # title, status, molab link, sources, file list
   <snake_slug>.py        # entry notebook, self-contained
   public/                # data and assets the notebook reads
-  reference/             # optional: known-good scripts, sources, notes (not checked as notebooks)
 templates/notebook.py    # start every new notebook here
 justfile                 # check, smoke, edit, new, list
 ```

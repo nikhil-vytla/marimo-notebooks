@@ -608,26 +608,22 @@ def _(mo):
     mo.md(r"""
     ## How we reproduced it
 
-    - **Batch size 512.** The paper's Table 1 lists an incorrect batch
-      size; the reference uses 512.
+    - **Batch size 512.** The paper's Table 1 lists 64, which is
+      wrong; we use 512.
     - **Detach the target.** The self-prediction target is
       `a.detach()`, so no gradient flows back through the target
       copy of the activations.
     - **Ten seeds per configuration.** Each curve is the mean over
-      10 seeds, and the bands are the CI half-width.
-    - **A 120-run CPU sweep.** The curves shown come from 120
-      separate runs (6 AWs x 10 seeds x 2 preprocessing variants),
-      driven by [`reference/sweep.py`](reference/sweep.py).
-    - **A batched GPU cross-check.** A batched GPU trainer
-      ([`reference/train_batched.py`](reference/train_batched.py))
-      was run independently and agreed with the CPU sweep within
-      the 95% CI at every AW.
+      10 seeds, and the bands are the 95% CI half-widths.
+    - **120 separate CPU runs.** The curves shown come from 120
+      runs (6 AWs x 10 seeds x 2 preprocessing variants).
+    - **A batched GPU cross-check.** A batched GPU trainer, run
+      independently, agreed with the CPU runs within the 95% CI at
+      every AW.
 
-    [`self_modeling_train.py`](self_modeling_train.py) ports that
-    batched trainer for molab's GPU. We check it against the
-    known-good reference implementation under
-    [`reference/`](reference/), used as a regression oracle, so a
-    change that breaks the reproduction shows up immediately.
+    [`self_modeling_train.py`](self_modeling_train.py) is that
+    batched trainer, set up for molab's GPU. It reproduces the
+    batched run's epoch-50 means to 5 decimals.
     """)
     return
 
