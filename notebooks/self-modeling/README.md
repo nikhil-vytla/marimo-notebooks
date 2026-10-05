@@ -1,0 +1,24 @@
+# Self-Modeling in Neural Systems
+
+Status: in-progress
+
+Reproduction of [Unexpected Benefits of Self-Modeling in Neural Systems](https://arxiv.org/abs/2407.10188) (Premakumar et al., 2024).
+
+- Essay: https://molab.marimo.io/github/nikhil-vytla/marimo-notebooks/blob/main/notebooks/self-modeling/self_modeling_essay.py
+- Train (GPU): https://molab.marimo.io/github/nikhil-vytla/marimo-notebooks/blob/main/notebooks/self-modeling/self_modeling_train.py
+
+## Files
+
+- `self_modeling_essay.py` — visual essay; reads `public/data/`; saved outputs in `__marimo__/session/`.
+- `self_modeling_train.py` — GPU notebook for molab; marked `# smoke: skip`; writes `public/data/mnist_fig2.json`. Its hidden-512 run reproduces the reference batched trainer's epoch-50 means to 5 decimals.
+- `reference/` — known-good scripts and per-run results, the regression oracle; see `reference/README.md`.
+- `public/data/` — `mnist_fig2a_local.json` (CPU sweep summary for preprocessing variants `a` and `b`) and `mnist_fig2.json` (training-notebook output incl. weight histograms, hidden 512 so far).
+
+## Corrections
+
+From `reference/CORRECTIONS.md`: batch size 512, `[-1, 1]` rescale, detached target.
+
+## Done / next
+
+- Done: Fig 2A reproduced within ~0.001.
+- Next: Fig 2B–D on molab GPU, RLCT (Fig 2C), IMDB (Fig 4), CIFAR-10 (Fig 3, ~4–6 h on molab GPU).
