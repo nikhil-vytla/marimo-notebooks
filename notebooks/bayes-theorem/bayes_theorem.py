@@ -1,18 +1,27 @@
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "marimo==0.25.1",
+#     "numpy==2.5.3",
+#     "pandas==3.0.6",
+#     "altair==6.3.0",
+# ]
+# ///
+
 import marimo
 
-__generated_with = "0.15.0"
+__generated_with = "0.25.1"
 app = marimo.App(width="medium", auto_download=["html"])
 
 
 @app.cell
 def _(mo):
-    mo.md(
-        r"""
+    mo.md(r"""
     # An Interactive Look at Bayes' Theorem
 
     This notebook provides an interactive exploration of Bayes' theorem, inspired by [this visualization](https://setosa.io/ev/conditional-probability/) and [this article](https://oscarbonilla.com/2009/05/visualizing-bayes-theorem/).
 
-    ## Definitions 
+    ## Definitions
     First, let's define a few terms:
 
     /// admonition | Conditional probability:
@@ -46,9 +55,9 @@ def _(mo):
     - $P(A)$ and $P(B)$: the probability of observing $A$ and $B$ respectively without any conditions, also know as the **prior probability** and **marginal probability**, respectively.
 
     /// details | Aside: a mini derivation of Bayes' theorem
-    Given the above definition of conditional probability, we can similarily state that for events $B$ and $A$:
+    Given the above definition of conditional probability, we can similarly state that for events $B$ and $A$:
 
-    $$P(B|A) = \frac{P(A \cap B)}{P(A)}$$ 
+    $$P(B|A) = \frac{P(A \cap B)}{P(A)}$$
 
     if $P(A) \neq 0$.
 
@@ -64,7 +73,7 @@ def _(mo):
 
     > "A person tests positive for the Flu. What's the probability they actually have the Flu?"
 
-    Statistically speaking, this is asking: $P(\textcolor{blue}{\text{Flu}} | \textcolor{red}{\text{Positive Test}})$. 
+    Statistically speaking, this is asking: $P(\textcolor{blue}{\text{Flu}} | \textcolor{red}{\text{Positive Test}})$.
 
     But in this scenario, we don't directly know this (and it can be very intensive to measure), so we need to calculate it from what we do know! Let's say we know/can measure the following:
 
@@ -77,8 +86,7 @@ def _(mo):
     ## Why is Bayes' theorem useful?
 
     In practice, it's much easier to measure test performance in controlled studies ([sensitivity/specificity](https://www.youtube.com/watch?v=vP06aMoz4v8)) than to directly measure "what % of positive tests are correct" in the real world. Bayes' theorem lets us flip the conditional relationship using data we can actually collect!
-    """
-    )
+    """)
     return
 
 
@@ -88,6 +96,7 @@ def _():
     import numpy as np
     import pandas as pd
     import altair as alt
+
     return alt, mo, pd
 
 
@@ -194,13 +203,17 @@ def _(calculations, mo):
 
 @app.cell
 def _(mo):
-    mo.md(r"""## Visualizing Conditional Probabilities and Bayes' Theorem""")
+    mo.md(r"""
+    ## Visualizing Conditional Probabilities and Bayes' Theorem
+    """)
     return
 
 
 @app.cell
 def _(mo):
-    mo.md(r"""1. **Population Distribution**: Shows the base rates (prior probabilities) of events $A$ and $¬A$""")
+    mo.md(r"""
+    1. **Population Distribution**: Shows the base rates (prior probabilities) of events $A$ and $¬A$
+    """)
     return
 
 
@@ -229,7 +242,9 @@ def _(alt, calculations, mo, pd):
 
 @app.cell
 def _(mo):
-    mo.md(r"""2. **Test Results by Group**: Displays how test results (event $B$) are distributed across different groups""")
+    mo.md(r"""
+    2. **Test Results by Group**: Displays how test results (event $B$) are distributed across different groups
+    """)
     return
 
 
@@ -261,7 +276,9 @@ def _(alt, calculations, mo, pd):
 
 @app.cell
 def _(mo):
-    mo.md(r"""3. **Components Breakdown**: Shows key components in Bayes' theorem (prior, posterior, likelihood, marginal, etc.)""")
+    mo.md(r"""
+    3. **Components Breakdown**: Shows key components in Bayes' theorem (prior, posterior, likelihood, marginal, etc.)
+    """)
     return
 
 
@@ -293,7 +310,9 @@ def _(alt, calculations, mo, pd):
 
 @app.cell
 def _(mo):
-    mo.md(r"""4. **Posterior Probability**: The final result - how much event $B$ changes our belief about event $A$""")
+    mo.md(r"""
+    4. **Posterior Probability**: The final result - how much event $B$ changes our belief about event $A$
+    """)
     return
 
 
@@ -323,7 +342,9 @@ def _(alt, calculations, mo, pd):
 
 @app.cell
 def _(mo):
-    mo.md(r"""5. **Area Visualization**: A spatial representation where areas are proportional to probabilities""")
+    mo.md(r"""
+    5. **Area Visualization**: A spatial representation where areas are proportional to probabilities
+    """)
     return
 
 

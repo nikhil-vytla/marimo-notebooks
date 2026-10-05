@@ -1,0 +1,31 @@
+name: check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: extractions/setup-just@v3
+      - run: just check
+
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: extractions/setup-just@v3
+      - name: Smoke test entry notebooks
+        run: |
+          for f in $(find notebooks -name '*.py' -not -path '*/reference/*' -not -path '*/tests/*'); do
+            if head -30 "$f" | grep -q '# smoke: skip'; then
+              echo "skip $f"
+              continue
+            fi
+            echo "smoke $f"
+            just smoke "$f"
+          done
