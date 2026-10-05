@@ -630,13 +630,430 @@ def _(mo):
 
 @app.cell
 def _(mo):
-    mo.md("""
-    /// admonition | Coming soon: Figure 2B-D
-    Does the compression effect hold as the network gets wider or
-    deeper? This section is a placeholder until the network-size
-    sweep data lands.
-    ///
+    mo.md(r"""
+    ## Does it hold across network sizes? (Figure 2B and 2D)
+
+    The Figure 2a effect could be a quirk of one architecture. The
+    paper repeats the same sweep at hidden sizes 64, 128, 256, and
+    512. Figure 2B tracks the spread of the final classifier weights
+    at epoch 50; Figure 2D tracks final test accuracy.
     """)
+    return
+
+
+@app.cell
+def _(AW_LIST, json, mo, pd):
+    _path = (
+        mo.notebook_location()
+        / "public"
+        / "data"
+        / "mnist_fig2.json"
+    )
+    FIG2 = json.loads(_path.read_text())
+    FIG2_SIZES = [int(_z) for _z in FIG2["config"]["hidden_sizes"]]
+    FIG2_SNAPSHOT_EPOCHS = [int(_e) for _e in FIG2["snapshot_epochs"]]
+    FIG2_BINS = int(FIG2["bins"])
+    FIG2_BIN_RANGE = [float(_v) for _v in FIG2["bin_range"]]
+
+    _sd_rows = []
+    _acc_rows = []
+    for _z in FIG2_SIZES:
+        _by_aw = FIG2["results"][str(_z)]["aws"]
+        for _aw in AW_LIST:
+            _entry = _by_aw[str(_aw)]
+            _sd_rows.append(
+                {
+                    "hidden": _z,
+                    "aw": _aw,
+                    "curve": f"AW={_aw}",
+                    "sd": float(_entry["sd_mean"][50]),
+                    "half": float(_entry["sd_ci"][50]),
+                }
+            )
+            _acc_rows.append(
+                {
+                    "hidden": _z,
+                    "aw": _aw,
+                    "curve": f"AW={_aw}",
+                    "acc": float(_entry["acc_mean"]),
+                    "half": float(_entry["acc_ci"]),
+                }
+            )
+    FIG2B = pd.DataFrame(_sd_rows)
+    FIG2B["lo"] = FIG2B["sd"] - FIG2B["half"]
+    FIG2B["hi"] = FIG2B["sd"] + FIG2B["half"]
+    FIG2D = pd.DataFrame(_acc_rows)
+    FIG2D["lo"] = FIG2D["acc"] - FIG2D["half"]
+    FIG2D["hi"] = FIG2D["acc"] + FIG2D["half"]
+
+    _paper_sd = {
+        0: [0.262, 0.190, 0.136, 0.098],
+        1: [0.235, 0.176, 0.130, 0.093],
+        5: [0.222, 0.165, 0.124, 0.091],
+        10: [0.231, 0.160, 0.118, 0.089],
+        20: [0.120, 0.170, 0.115, 0.087],
+        50: [0.096, 0.080, 0.113, 0.083],
+    }
+    PAPER_FIG2B = pd.DataFrame(
+        [
+            {
+                "hidden": _z,
+                "aw": _aw,
+                "curve": f"AW={_aw}",
+                "paper": _v,
+            }
+            for _aw, _values in _paper_sd.items()
+            for _z, _v in zip(FIG2_SIZES, _values)
+        ]
+    )
+
+    _paper_acc = {
+        20: [0.27, 0.96, 0.96, 0.97],
+        50: [0.11, 0.14, 0.93, 0.96],
+    }
+    PAPER_FIG2D = pd.DataFrame(
+        [
+            {
+                "hidden": _z,
+                "aw": _aw,
+                "curve": f"AW={_aw}",
+                "paper": _v,
+            }
+            for _aw, _values in _paper_acc.items()
+            for _z, _v in zip(FIG2_SIZES, _values)
+        ]
+    )
+    return (
+        FIG2,
+        FIG2B,
+        FIG2D,
+        FIG2_BINS,
+        FIG2_BIN_RANGE,
+        FIG2_SIZES,
+        FIG2_SNAPSHOT_EPOCHS,
+        PAPER_FIG2B,
+        PAPER_FIG2D,
+    )
+
+
+@app.cell
+def _(AW_LIST, FIG2B, PAPER_COLORS, PAPER_FIG2B, alt, mo):
+    _domain = [f"AW={_a}" for _a in AW_LIST]
+    _scale = alt.Scale(
+        domain=_domain,
+        range=[PAPER_COLORS[_a] for _a in AW_LIST],
+    )
+    _order = sorted(FIG2B["hidden"].unique().tolist())
+    _y_domain = [
+        float(min(FIG2B["lo"].min(), PAPER_FIG2B["paper"].min()))
+        - 0.005,
+        float(max(FIG2B["hi"].max(), PAPER_FIG2B["paper"].max()))
+        + 0.005,
+    ]
+    _x = alt.X(
+        "hidden:O",
+        title="Hidden size",
+        sort=_order,
+        axis=alt.Axis(labelAngle=0),
+    )
+    _band = (
+        alt.Chart(FIG2B)
+        .mark_area(opacity=0.16)
+        .encode(
+            x=_x,
+            y=alt.Y(
+                "lo:Q",
+                title="SD of classifier weights (epoch 50)",
+                scale=alt.Scale(domain=_y_domain, zero=False),
+            ),
+            y2="hi:Q",
+            color=alt.Color("curve:N", scale=_scale, legend=None),
+        )
+    )
+    _line = (
+        alt.Chart(FIG2B)
+        .mark_line(strokeWidth=2)
+        .encode(
+            x=_x,
+            y=alt.Y(
+                "sd:Q",
+                scale=alt.Scale(domain=_y_domain, zero=False),
+            ),
+            color=alt.Color(
+                "curve:N",
+                scale=_scale,
+                legend=alt.Legend(title="AW"),
+            ),
+            tooltip=[
+                alt.Tooltip("hidden:O"),
+                alt.Tooltip("curve:N"),
+                alt.Tooltip("sd:Q", format=".4f"),
+            ],
+        )
+    )
+    _points = (
+        alt.Chart(PAPER_FIG2B)
+        .mark_point(filled=False, strokeWidth=1.6, size=70)
+        .encode(
+            x=_x,
+            y=alt.Y(
+                "paper:Q",
+                scale=alt.Scale(domain=_y_domain, zero=False),
+            ),
+            color=alt.Color("curve:N", scale=_scale, legend=None),
+            tooltip=[
+                alt.Tooltip("curve:N"),
+                alt.Tooltip("paper:Q", title="paper", format=".3f"),
+            ],
+        )
+    )
+    _chart = (_band + _line + _points).properties(
+        width=620,
+        height=340,
+    )
+    mo.ui.altair_chart(_chart)
+    return
+
+
+@app.cell
+def _(AW_LIST, FIG2B, FIG2D, PAPER_COLORS, PAPER_FIG2D, alt, mo):
+    _domain = [f"AW={_a}" for _a in AW_LIST]
+    _scale = alt.Scale(
+        domain=_domain,
+        range=[PAPER_COLORS[_a] for _a in AW_LIST],
+    )
+    _order = sorted(FIG2D["hidden"].unique().tolist())
+    _y_domain = [0.0, 1.0]
+    _x = alt.X(
+        "hidden:O",
+        title="Hidden size",
+        sort=_order,
+        axis=alt.Axis(labelAngle=0),
+    )
+    _band = (
+        alt.Chart(FIG2D)
+        .mark_area(opacity=0.16)
+        .encode(
+            x=_x,
+            y=alt.Y(
+                "lo:Q",
+                title="Final test accuracy",
+                scale=alt.Scale(domain=_y_domain),
+            ),
+            y2="hi:Q",
+            color=alt.Color("curve:N", scale=_scale, legend=None),
+        )
+    )
+    _line = (
+        alt.Chart(FIG2D)
+        .mark_line(strokeWidth=2)
+        .encode(
+            x=_x,
+            y=alt.Y(
+                "acc:Q",
+                scale=alt.Scale(domain=_y_domain),
+            ),
+            color=alt.Color(
+                "curve:N",
+                scale=_scale,
+                legend=alt.Legend(title="AW"),
+            ),
+            tooltip=[
+                alt.Tooltip("hidden:O"),
+                alt.Tooltip("curve:N"),
+                alt.Tooltip("acc:Q", format=".4f"),
+            ],
+        )
+    )
+    _points = (
+        alt.Chart(PAPER_FIG2D)
+        .mark_point(filled=False, strokeWidth=1.6, size=70)
+        .encode(
+            x=_x,
+            y=alt.Y(
+                "paper:Q",
+                scale=alt.Scale(domain=_y_domain),
+            ),
+            color=alt.Color("curve:N", scale=_scale, legend=None),
+            tooltip=[
+                alt.Tooltip("curve:N"),
+                alt.Tooltip("paper:Q", title="paper", format=".2f"),
+            ],
+        )
+    )
+    _chart = (_band + _line + _points).properties(
+        width=620,
+        height=340,
+    )
+
+    _sd = {
+        (_r["aw"], _r["hidden"]): float(_r["sd"])
+        for _r in FIG2B.to_dict("records")
+    }
+    _acc = {
+        (_r["aw"], _r["hidden"]): float(_r["acc"])
+        for _r in FIG2D.to_dict("records")
+    }
+    _collapse = {(20, 64), (50, 64), (50, 128)}
+    _healthy = [
+        _acc[(_r["aw"], _r["hidden"])]
+        for _r in FIG2D.to_dict("records")
+        if (_r["aw"], _r["hidden"]) not in _collapse
+    ]
+
+    _prose = mo.md(f"""
+    Bigger hidden layers have narrower weights overall, and
+    self-modeling narrows them further at every size. At AW = 0 the
+    epoch-50 SD falls from {_sd[(0, 64)]:.3f} at hidden 64 to
+    {_sd[(0, 512)]:.3f} at hidden 512; at AW = 50 it falls from
+    {_sd[(50, 64)]:.3f} to {_sd[(50, 512)]:.3f}.
+
+    The exception is small networks at large AW. Accuracy collapses
+    to near chance (~11%) for AW 20 at hidden 64
+    ({_acc[(20, 64)]:.1%}) and for AW 50 at hidden 64
+    ({_acc[(50, 64)]:.1%}) and hidden 128 ({_acc[(50, 128)]:.1%}).
+    There the self-model term swamps the classification task, so the
+    narrow weights are a failure, not a simplification. Everywhere
+    else final accuracy stays in
+    [{min(_healthy):.1%}, {max(_healthy):.1%}]. Figure 2D marks the
+    paper's AW 20 and AW 50 read-offs; its other four curves sit near
+    0.95-0.97 at every size.
+    """)
+    mo.vstack([mo.ui.altair_chart(_chart), _prose])
+    return
+
+
+@app.cell
+def _(FIG2_SIZES, FIG2_SNAPSHOT_EPOCHS, mo):
+    hist_epoch = mo.ui.slider(
+        steps=FIG2_SNAPSHOT_EPOCHS,
+        value=FIG2_SNAPSHOT_EPOCHS[0],
+        label="Snapshot epoch",
+    )
+    hist_size = mo.ui.dropdown(
+        options=FIG2_SIZES,
+        value=512,
+        label="Hidden size",
+    )
+    mo.hstack([hist_size, hist_epoch])
+    return hist_epoch, hist_size
+
+
+@app.cell
+def _(
+    FIG2,
+    FIG2_BINS,
+    FIG2_BIN_RANGE,
+    alt,
+    hist_epoch,
+    hist_size,
+    mo,
+    np,
+    pd,
+):
+    _size = int(hist_size.value)
+    _epoch = int(hist_epoch.value)
+    _edges = np.linspace(
+        FIG2_BIN_RANGE[0],
+        FIG2_BIN_RANGE[1],
+        FIG2_BINS + 1,
+    )
+    _centers = (_edges[:-1] + _edges[1:]) / 2
+    _by_aw = FIG2["results"][str(_size)]["aws"]
+
+    # Fixed x-domain for this hidden size, pooled over every snapshot
+    # epoch so the slider changes the curves but not the scale. The
+    # seed-averaged histograms have near-zero tails in almost every
+    # bin, so a bare nonzero test would keep the full [-0.6, 0.6]
+    # range and squeeze hidden-512 into a few pixels. Treat bins under
+    # 1% of the peak as empty, take the central occupied span across
+    # both series, and pad one bin on each side.
+    _floor = 0.01 * max(
+        max(_counts)
+        for _aw in (0, 50)
+        for _counts in _by_aw[str(_aw)]["hist_mean"].values()
+    )
+    _occupied = np.flatnonzero(
+        np.any(
+            [
+                np.asarray(_counts) >= _floor
+                for _aw in (0, 50)
+                for _counts in _by_aw[str(_aw)]["hist_mean"].values()
+            ],
+            axis=0,
+        )
+    )
+    _x_domain = [
+        float(_edges[max(int(_occupied.min()) - 1, 0)]),
+        float(_edges[min(int(_occupied.max()) + 2, FIG2_BINS)]),
+    ]
+
+    _rows = []
+    for _aw in (0, 50):
+        _counts = _by_aw[str(_aw)]["hist_mean"][str(_epoch)]
+        for _bin, _count in zip(_centers, _counts):
+            _rows.append(
+                {
+                    "bin": float(_bin),
+                    "density": float(_count),
+                    "curve": f"AW={_aw}",
+                }
+            )
+    _hist = pd.DataFrame(_rows)
+
+    _chart = (
+        alt.Chart(_hist)
+        .mark_area(opacity=0.5, interpolate="step")
+        .encode(
+            x=alt.X(
+                "bin:Q",
+                title="Classifier weight",
+                scale=alt.Scale(domain=_x_domain),
+            ),
+            y=alt.Y("density:Q", title="Mean count", stack=None),
+            color=alt.Color(
+                "curve:N",
+                scale=alt.Scale(
+                    domain=["AW=0", "AW=50"],
+                    range=["#000000", "#00bfff"],
+                ),
+                legend=alt.Legend(title="AW"),
+            ),
+            tooltip=[
+                alt.Tooltip("bin:Q", format=".3f"),
+                alt.Tooltip("density:Q", format=".4f"),
+            ],
+        )
+        .properties(width=600, height=300)
+    )
+    mo.vstack(
+        [
+            mo.ui.altair_chart(_chart),
+            mo.md(
+                f"Hidden {_size}, snapshot epoch {_epoch}: watch the "
+                "AW = 50 distribution stay narrower as training "
+                "goes on."
+            ),
+        ]
+    )
+    return
+
+
+@app.cell
+def _(FIG2, FIG2_SIZES, mo):
+    _config = FIG2["config"]
+    _n = (
+        len(FIG2_SIZES)
+        * len(_config["aws"])
+        * int(_config["seeds"])
+    )
+    _device = FIG2["device"]["name"]
+    mo.md(
+        f"Data: {_n} models ({len(FIG2_SIZES)} sizes x "
+        f"{len(_config['aws'])} AWs x {int(_config['seeds'])} seeds) "
+        f"trained on a molab GPU ({_device}), about 43 s of GPU "
+        "time."
+    )
     return
 
 
