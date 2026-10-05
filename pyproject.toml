@@ -1,0 +1,25 @@
+[project]
+name = "marimo-notebooks"
+version = "0.0.0"
+requires-python = ">=3.11"
+
+[dependency-groups]
+dev = [
+    "marimo>=0.25.1",
+    "ruff>=0.9",
+]
+
+[tool.ruff]
+line-length = 79
+target-version = "py311"
+# Reference implementations and their tests are plain scripts kept as-is,
+# not notebooks. Exclude them from linting (marimo check does the same).
+extend-exclude = ["notebooks/*/reference", "notebooks/*/tests"]
+
+[tool.ruff.lint]
+ignore = [
+    "B018",    # marimo cells can end in bare expressions
+    "PLR1711", # marimo cells end in a bare `return`
+    "I001",    # marimo import cells are not isort-sorted
+    "F401",    # notebook imports are often used from another cell
+]

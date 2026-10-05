@@ -1,0 +1,13 @@
+[files]
+extend-exclude = [
+    "notebooks/*/reference/results/**",
+    "**/*.json",
+    "uv.lock",
+    "**/__marimo__/**",
+]
+
+[default.extend-words]
+# Legitimate technical terms / false positives.
+Paeth = "Paeth"
+PN = "PN"
+FPR = "FPR"
