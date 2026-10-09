@@ -725,7 +725,6 @@ def _(mo):
             mo.hstack([rlct_button, rlct_plateau_button], justify="start", gap=2),
         ]
     )
-
     return rlct_button, rlct_plateau_button
 
 
@@ -734,37 +733,41 @@ def _(F, load_mnist, mo, nn, np, os, runs, t95, time, torch):
     import shutil
     import tempfile
 
-    RLCT_BATCH = 512
-    RLCT_LR = 1e-4
-    RLCT_NUM_BURNIN_STEPS = 0
-    RLCT_STEPS_BW_DRAWS = 1
-    RLCT_NUM_INIT_LOSS_BATCHES = 117
-    RLCT_INIT_SEED = 0
-    RLCT_NBETA = 512.0 / float(np.log(512.0))
-    RLCT_NBETA_CONVENTION = "512/log(512) (devinterp batch-based optimal temperature)"
+    # Single source of truth for every RLCT hyperparameter. Values are unchanged
+    # from earlier runs so the persistent caches still resolve.
+    RLCT_CONFIG = {
+        # Published localization (restored, never recomputed) and the new batched
+        # sweep localization, each with the draw count used to reproduce its cache.
+        "published_localization": 1000.0,
+        "sweep_localization": 100.0,
+        "num_draws": {1000.0: 200, 100.0: 4000},
+        "num_chains": 4,
+        "nbeta": 512.0 / float(np.log(512.0)),
+        "nbeta_convention": "512/log(512) (devinterp batch-based optimal temperature)",
+        "lr": 1e-4,
+        "batch_size": 512,
+        "seed": 0,
+        "num_burnin_steps": 0,
+        "num_steps_bw_draws": 1,
+        "num_init_loss_batches": 117,
+        # Batched-estimator validation against devinterp on the pilot models.
+        "pilot_hidden": 512,
+        "pilot_pairs": ((0.0, 0), (0.0, 1), (50.0, 0), (50.0, 1)),
+        "validation_draws": 4000,
+        "validation_tolerance": 0.03,
+        "convergence_draws": (4000, 6000),
+        "convergence_tolerance": 0.02,
+    }
 
     # Published Figure 2C payload; also the source for previously computed results.
     RLCT_DATA_PATH = os.path.join(
         str(mo.notebook_location() or ""), "public", "data", "mnist_fig2c.json"
     )
 
-    # Explicit sampling configuration. ``localizations`` are estimated in order and
-    # cached under their own keys, so the published localization=1000 results and a
-    # new localization=100 sweep coexist.
-    rlct_config = {
-        "localizations": (1000.0, 100.0),
-        "num_chains": 4,
-        "num_draws": 200,
-    }
-    # Results at this localization are already published; restore, never recompute.
-    RLCT_PUBLISHED_LOCALIZATION = 1000.0
-    # Plateau check: four pilot models (H=512, AW in {0, 50}, seeds {0, 1}).
+    # Plateau check: the four pilot models at localization=100, re-estimated with
+    # devinterp over a range of draw counts.
     rlct_plateau_config = {
-        "hidden": 512,
-        "localization": 100.0,
-        "num_chains": 4,
         "draws": (1000, 2000, 4000),
-        "pairs": ((0.0, 0), (0.0, 1), (50.0, 0), (50.0, 1)),
         "tolerance": 0.02,
     }
 
@@ -895,16 +898,16 @@ def _(F, load_mnist, mo, nn, np, os, runs, t95, time, torch):
                         model,
                         dataset,
                         {},
-                        lr=RLCT_LR,
-                        n_beta=RLCT_NBETA,
+                        lr=RLCT_CONFIG["lr"],
+                        n_beta=RLCT_CONFIG["nbeta"],
                         num_chains=num_chains,
                         num_draws=num_draws,
-                        batch_size=RLCT_BATCH,
-                        num_burnin_steps=RLCT_NUM_BURNIN_STEPS,
-                        num_steps_bw_draws=RLCT_STEPS_BW_DRAWS,
+                        batch_size=RLCT_CONFIG["batch_size"],
+                        num_burnin_steps=RLCT_CONFIG["num_burnin_steps"],
+                        num_steps_bw_draws=RLCT_CONFIG["num_steps_bw_draws"],
                         localization=float(localization),
-                        num_init_loss_batches=RLCT_NUM_INIT_LOSS_BATCHES,
-                        init_seed=RLCT_INIT_SEED,
+                        num_init_loss_batches=RLCT_CONFIG["num_init_loss_batches"],
+                        init_seed=RLCT_CONFIG["seed"],
                         device=device_type,
                         loss_fn=_rlct_loss,
                         noise_level=1.0,
@@ -948,16 +951,8 @@ def _(F, load_mnist, mo, nn, np, os, runs, t95, time, torch):
 
 
     return (
-        RLCT_BATCH,
+        RLCT_CONFIG,
         RLCT_DATA_PATH,
-        RLCT_INIT_SEED,
-        RLCT_LR,
-        RLCT_NBETA,
-        RLCT_NBETA_CONVENTION,
-        RLCT_NUM_BURNIN_STEPS,
-        RLCT_NUM_INIT_LOSS_BATCHES,
-        RLCT_PUBLISHED_LOCALIZATION,
-        RLCT_STEPS_BW_DRAWS,
         estimate_rlct,
         rlct_plateau_config,
         rlct_weight_fingerprint,
@@ -967,10 +962,7 @@ def _(F, load_mnist, mo, nn, np, os, runs, t95, time, torch):
 @app.cell
 def rlct_batched_estimator(
     F,
-    RLCT_BATCH,
-    RLCT_INIT_SEED,
-    RLCT_LR,
-    RLCT_NBETA,
+    RLCT_CONFIG,
     forward_batched,
     load_mnist,
     mo,
@@ -995,13 +987,6 @@ def rlct_batched_estimator(
     # With match_sampling_input_ids_across_chains=True devinterp walks one fixed,
     # seeded 117-batch permutation for every chain (and, because init_seed is the
     # same, for every model), so we reproduce that exact order.
-    RLCT_BATCHED_CONFIG = {
-        "num_chains": 4,
-        "localizations": {1000.0: 200, 100.0: 4000},
-        "seed": 0,
-    }
-
-
     class _RlctIndexDataset(torch.utils.data.Dataset):
         """(train index, label) rows for a DataLoader over the MNIST train set."""
 
@@ -1023,10 +1008,10 @@ def rlct_batched_estimator(
 
     def _rlct_batch_order(y):
         """The fixed minibatch order devinterp 2.0.1 samples with this config."""
-        generator = torch.Generator().manual_seed(RLCT_INIT_SEED)
+        generator = torch.Generator().manual_seed(RLCT_CONFIG["seed"])
         loader = torch.utils.data.DataLoader(
             _RlctIndexDataset(y),
-            batch_size=RLCT_BATCH,
+            batch_size=RLCT_CONFIG["batch_size"],
             shuffle=True,
             generator=generator,
             drop_last=True,
@@ -1079,14 +1064,13 @@ def rlct_batched_estimator(
                     logits.reshape(-1, 10),
                     y[idx].unsqueeze(0).expand(M, -1).reshape(-1),
                     reduction="none",
-                ).reshape(M, RLCT_BATCH).mean(dim=1)
+                ).reshape(M, RLCT_CONFIG["batch_size"]).mean(dim=1)
                 L0 += ce / n_batches
 
         w0 = [
             t.repeat_interleave(num_chains, dim=0).contiguous() for t in w0_single
         ]
         params = [t.clone().requires_grad_(True) for t in w0]
-        W1, b1, W2, b2 = params
         L0 = L0.repeat_interleave(num_chains)
 
         torch.manual_seed(seed)
@@ -1098,18 +1082,26 @@ def rlct_batched_estimator(
             logits, _a_hat, _a = forward_batched(params, xb)
             ce = F.cross_entropy(
                 logits.reshape(-1, 10), yb.reshape(-1), reduction="none"
-            ).reshape(losses.shape[0], RLCT_BATCH).mean(dim=1)
+            ).reshape(losses.shape[0], RLCT_CONFIG["batch_size"]).mean(dim=1)
             losses[:, step] = ce.detach()
             ce.sum().backward()
             with torch.no_grad():
                 for i, p in enumerate(params):
-                    p.add_(p - w0[i], alpha=-0.5 * RLCT_LR * localization)
-                    p.add_(p.grad, alpha=-0.5 * RLCT_LR * RLCT_NBETA)
-                    p.add_(torch.randn_like(p), alpha=RLCT_LR**0.5)
+                    p.add_(
+                        p - w0[i],
+                        alpha=-0.5 * RLCT_CONFIG["lr"] * localization,
+                    )
+                    p.add_(
+                        p.grad,
+                        alpha=-0.5 * RLCT_CONFIG["lr"] * RLCT_CONFIG["nbeta"],
+                    )
+                    p.add_(
+                        torch.randn_like(p), alpha=RLCT_CONFIG["lr"] ** 0.5
+                    )
                     p.grad = None
 
         llc_per_chain = (
-            RLCT_NBETA * (losses.mean(dim=1) - L0)
+            RLCT_CONFIG["nbeta"] * (losses.mean(dim=1) - L0)
         ).reshape(len(pairs), num_chains)
         llc_per_model = llc_per_chain.mean(dim=1)
 
@@ -1131,22 +1123,13 @@ def rlct_batched_estimator(
             )
         return out
 
-    return RLCT_BATCHED_CONFIG, estimate_rlct_batched
+    return (estimate_rlct_batched,)
 
 
 @app.cell
 def _(
-    RLCT_BATCH,
-    RLCT_BATCHED_CONFIG,
+    RLCT_CONFIG,
     RLCT_DATA_PATH,
-    RLCT_INIT_SEED,
-    RLCT_LR,
-    RLCT_NBETA,
-    RLCT_NBETA_CONVENTION,
-    RLCT_NUM_BURNIN_STEPS,
-    RLCT_NUM_INIT_LOSS_BATCHES,
-    RLCT_PUBLISHED_LOCALIZATION,
-    RLCT_STEPS_BW_DRAWS,
     device,
     eff_aws,
     eff_epochs,
@@ -1181,7 +1164,7 @@ def _(
         if "rlct" in blob:
             # Pre-``by_localization`` payload: these are the published results.
             return {
-                f"{RLCT_PUBLISHED_LOCALIZATION:g}": {
+                f"{RLCT_CONFIG['published_localization']:g}": {
                     "rlct": blob["rlct"],
                     "hyperparams": blob.get("hyperparams", {}),
                 }
@@ -1198,18 +1181,18 @@ def _(
                 "cross-entropy on pruned classification head "
                 "(W1, b1, W2[:10], b2[:10]), MNIST train set"
             ),
-            "lr": RLCT_LR,
+            "lr": RLCT_CONFIG["lr"],
             "localization": float(localization),
-            "nbeta": RLCT_NBETA,
-            "nbeta_convention": RLCT_NBETA_CONVENTION,
-            "nbeta_library_default": 512.0 / float(np.log(512.0)),
+            "nbeta": RLCT_CONFIG["nbeta"],
+            "nbeta_convention": RLCT_CONFIG["nbeta_convention"],
+            "nbeta_library_default": RLCT_CONFIG["nbeta"],
             "num_chains": int(num_chains),
             "num_draws": int(num_draws),
-            "num_burnin_steps": RLCT_NUM_BURNIN_STEPS,
-            "num_steps_bw_draws": RLCT_STEPS_BW_DRAWS,
-            "batch_size": RLCT_BATCH,
-            "num_init_loss_batches": RLCT_NUM_INIT_LOSS_BATCHES,
-            "init_seed": RLCT_INIT_SEED,
+            "num_burnin_steps": RLCT_CONFIG["num_burnin_steps"],
+            "num_steps_bw_draws": RLCT_CONFIG["num_steps_bw_draws"],
+            "batch_size": RLCT_CONFIG["batch_size"],
+            "num_init_loss_batches": RLCT_CONFIG["num_init_loss_batches"],
+            "init_seed": RLCT_CONFIG["seed"],
             "device": str(device_type),
             "mala_acceptance": "not implemented in devinterp 2.0.1",
             "pilot": {
@@ -1223,7 +1206,7 @@ def _(
     def _rlct_batched_hyperparams(localization, num_chains, num_draws, device_type):
         out = rlct_hyperparams(localization, num_chains, num_draws, device_type)
         out["estimator"] = "batched SGLD, validated against devinterp 2.0.1"
-        out["seed"] = RLCT_BATCHED_CONFIG["seed"]
+        out["seed"] = RLCT_CONFIG["seed"]
         out["data_order"] = (
             "one fixed seeded 117-batch permutation shared across chains and models "
             "(devinterp match_sampling_input_ids_across_chains=True, "
@@ -1271,32 +1254,37 @@ def _(
         seeds_n,
         epochs_n,
         device_type,
-        validation_draws=4000,
-        convergence_draws=(4000, 6000),
-        convergence_tolerance=0.02,
-        validation_tolerance=0.03,
     ):
         """Validate the batched estimator, then run the full loc=100 sweep.
 
         Returns a ``by_localization`` payload. The localized-1000 entry keeps the
         restored devinterp results and adds a cheap batched cross-check.
         """
-        n_chains = RLCT_BATCHED_CONFIG["num_chains"]
-        seed = RLCT_BATCHED_CONFIG["seed"]
+        n_chains = RLCT_CONFIG["num_chains"]
+        seed = RLCT_CONFIG["seed"]
+        pilot_hidden = RLCT_CONFIG["pilot_hidden"]
+        pilot_pairs = RLCT_CONFIG["pilot_pairs"]
+        validation_draws = RLCT_CONFIG["validation_draws"]
+        validation_tolerance = RLCT_CONFIG["validation_tolerance"]
+        convergence_draws = RLCT_CONFIG["convergence_draws"]
+        convergence_tolerance = RLCT_CONFIG["convergence_tolerance"]
+        published_localization = RLCT_CONFIG["published_localization"]
+        sweep_localization = RLCT_CONFIG["sweep_localization"]
+        published_draws = RLCT_CONFIG["num_draws"][published_localization]
+        sweep_draws = RLCT_CONFIG["num_draws"][sweep_localization]
         pairs_all = tuple((float(a), s) for a in aws_list for s in range(seeds_n))
         fingerprints = {
             int(h): rlct_weight_fingerprint(runs, int(h)) for h in hidden_sizes
         }
-        pilot_pairs = ((0.0, 0), (0.0, 1), (50.0, 0), (50.0, 1))
 
         # 1. validation against devinterp on the four pilot models.
         batched_validation = estimate_rlct_batched(
-            512,
+            pilot_hidden,
             pilot_pairs,
             epochs_n,
             device_type,
-            fingerprints[512],
-            100.0,
+            fingerprints[pilot_hidden],
+            sweep_localization,
             n_chains,
             int(validation_draws),
             seed,
@@ -1307,12 +1295,12 @@ def _(
             )
         else:
             devinterp = estimate_rlct(
-                512,
+                pilot_hidden,
                 pilot_pairs,
                 epochs_n,
                 device_type,
-                fingerprints[512],
-                100.0,
+                fingerprints[pilot_hidden],
+                sweep_localization,
                 n_chains,
                 int(validation_draws),
             )
@@ -1329,12 +1317,12 @@ def _(
         convergence = {}
         for draws in convergence_draws:
             convergence[str(int(draws))] = estimate_rlct_batched(
-                512,
+                pilot_hidden,
                 pilot_pairs,
                 epochs_n,
                 device_type,
-                fingerprints[512],
-                100.0,
+                fingerprints[pilot_hidden],
+                sweep_localization,
                 n_chains,
                 int(draws),
                 seed,
@@ -1378,16 +1366,16 @@ def _(
                 epochs_n,
                 device_type,
                 fingerprints[int(h)],
-                100.0,
+                sweep_localization,
                 n_chains,
-                4000,
+                sweep_draws,
                 seed,
             )
 
         # 4. loc=1000 batched cross-check against the restored devinterp results.
         prior = _load_prior_rlct(RLCT_DATA_PATH)
-        restored = prior.get(f"{RLCT_PUBLISHED_LOCALIZATION:g}") or prior.get(
-            str(int(RLCT_PUBLISHED_LOCALIZATION))
+        restored = prior.get(f"{published_localization:g}") or prior.get(
+            str(int(published_localization))
         )
         cross_check = {}
         cross_worst = 0.0
@@ -1398,9 +1386,9 @@ def _(
                 epochs_n,
                 device_type,
                 fingerprints[int(h)],
-                RLCT_PUBLISHED_LOCALIZATION,
+                published_localization,
                 n_chains,
-                200,
+                published_draws,
                 seed,
             )
             cross_check[str(int(h))] = {}
@@ -1432,19 +1420,19 @@ def _(
                 cross_check[str(int(h))][aw_key] = row
 
         return {
-            "1000": {
+            f"{published_localization:g}": {
                 "rlct": (restored or {}).get("rlct"),
                 "hyperparams": (restored or {}).get("hyperparams")
                 or rlct_hyperparams(
-                    RLCT_PUBLISHED_LOCALIZATION, n_chains, 200, device_type
+                    published_localization, n_chains, published_draws, device_type
                 ),
                 "batched_cross_check": cross_check,
                 "cross_check_worst_rel_diff": float(cross_worst),
             },
-            "100": {
+            f"{sweep_localization:g}": {
                 "rlct": per_hidden,
                 "hyperparams": _rlct_batched_hyperparams(
-                    100.0, n_chains, 4000, device_type
+                    sweep_localization, n_chains, sweep_draws, device_type
                 ),
                 "validation": validation,
                 "convergence_check": convergence_check,
@@ -1460,12 +1448,12 @@ def _(
     else:
         # Restore whatever was last written so reloading keeps Figure 2C.
         rlct_by_localization = _load_prior_rlct(RLCT_DATA_PATH) or None
-
     return rlct_by_localization, rlct_hyperparams
 
 
 @app.cell
 def _(
+    RLCT_CONFIG,
     device,
     eff_epochs,
     estimate_rlct,
@@ -1494,7 +1482,8 @@ def _(
 
     if rlct_plateau_button.value and runs:
         _pcfg = rlct_plateau_config
-        _hidden = _pcfg["hidden"]
+        _hidden = RLCT_CONFIG["pilot_hidden"]
+        _localization = float(RLCT_CONFIG["sweep_localization"])
         _fingerprint = rlct_weight_fingerprint(runs, _hidden)
         _models_by_draws = {}
         _total_seconds = {}
@@ -1502,12 +1491,12 @@ def _(
             _started = time.perf_counter()
             _res = estimate_rlct(
                 _hidden,
-                _pcfg["pairs"],
+                RLCT_CONFIG["pilot_pairs"],
                 eff_epochs,
                 device.type,
                 _fingerprint,
-                float(_pcfg["localization"]),
-                int(_pcfg["num_chains"]),
+                _localization,
+                int(RLCT_CONFIG["num_chains"]),
                 int(_n),
             )
             _total_seconds[str(_n)] = time.perf_counter() - _started
@@ -1527,8 +1516,8 @@ def _(
             print(f"plateau draws={_n}: {_total_seconds[str(_n)]:.1f}s")
         rlct_plateau = {
             "hidden": _hidden,
-            "localization": float(_pcfg["localization"]),
-            "num_chains": int(_pcfg["num_chains"]),
+            "localization": _localization,
+            "num_chains": int(RLCT_CONFIG["num_chains"]),
             "draws": [int(_n) for _n in _pcfg["draws"]],
             "q3_q4_tolerance": float(_pcfg["tolerance"]),
             "models_by_draws": _models_by_draws,
@@ -1540,7 +1529,6 @@ def _(
         print(f"plateau chosen draws: {rlct_plateau['chosen_draws']}")
     else:
         rlct_plateau = None
-
     return (rlct_plateau,)
 
 
@@ -1634,7 +1622,6 @@ def _(alt, np, pd, rlct_by_localization, rlct_plateau, t95):
         )
 
     fig2c
-
     return
 
 
@@ -1710,7 +1697,6 @@ def _(
             ]
         )
     _out
-
     return
 
 

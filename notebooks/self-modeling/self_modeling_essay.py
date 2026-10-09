@@ -1059,11 +1059,283 @@ def _(FIG2, FIG2_SIZES, mo):
 
 @app.cell
 def _(mo):
-    mo.md("""
-    /// admonition | Coming soon: RLCT
-    A better ruler for complexity. The paper measures the model with
-    the real log canonical threshold, not just weight spread. This
-    placeholder will explain and plot it.
+    mo.md(r"""
+    ## A better ruler: RLCT (Figure 2C)
+
+    Weight spread is a crude proxy for complexity. A network can
+    hold many small weights and still have many effective degrees of
+    freedom, and spread says nothing about how the loss actually
+    responds when you move the weights. What we want is a quantity
+    that counts the directions the trained solution is genuinely
+    free to move in.
+
+    The real log canonical threshold (RLCT), estimated here as the
+    local learning coefficient (LLC), does that. It measures the
+    effective dimensionality of the loss landscape around the
+    trained weights: how fast the loss rises as you wander away
+    from them. We estimate it with a noisy random walk (stochastic
+    gradient Langevin dynamics, SGLD) tethered to the trained
+    weights by a localization strength. Lower RLCT means fewer
+    effective parameters, so the same pattern as Figure 2a should
+    show up here as a lower curve for larger self-prediction
+    weights.
+    """)
+    return
+
+
+@app.cell
+def _(AW_LIST, PAPER_COLORS, json, mo, pd):
+    _path = (
+        mo.notebook_location()
+        / "public"
+        / "data"
+        / "mnist_fig2c.json"
+    )
+    RLCT_RAW = json.loads(_path.read_text())
+    RLCT_SIZES = sorted(
+        int(_size)
+        for _size in RLCT_RAW["by_localization"]["100"]["rlct"]
+    )
+
+    _rows = []
+    for _loc, _entry in RLCT_RAW["by_localization"].items():
+        for _size in RLCT_SIZES:
+            for _aw in AW_LIST:
+                _e = _entry["rlct"][str(_size)][str(_aw)]
+                _rows.append(
+                    {
+                        "localization": _loc,
+                        "hidden": _size,
+                        "aw": _aw,
+                        "curve": f"AW={_aw}",
+                        "mean": float(_e["mean"]),
+                        "ci": float(_e["ci"]),
+                    }
+                )
+    FIG2C = pd.DataFrame(_rows)
+    FIG2C["lo"] = FIG2C["mean"] - FIG2C["ci"]
+    FIG2C["hi"] = FIG2C["mean"] + FIG2C["ci"]
+
+    _paper_values = {
+        0: [33, 38, 46, 58],
+        1: [32, 37, 45, 58],
+        5: [30, 34, 42, 56],
+        10: [26, 32, 40, 53],
+        20: [-4, 28, 37, 49],
+        50: [-5, -16, 28, 37],
+    }
+    PAPER_FIG2C = pd.DataFrame(
+        [
+            {
+                "aw": _aw,
+                "hidden": _size,
+                "curve": f"AW={_aw}",
+                "paper": _value,
+            }
+            for _aw, _values in _paper_values.items()
+            for _size, _value in zip(RLCT_SIZES, _values)
+        ]
+    )
+    return FIG2C, PAPER_FIG2C, RLCT_RAW, RLCT_SIZES
+
+
+@app.cell
+def _(RLCT_RAW, mo):
+    _locs = sorted(
+        RLCT_RAW["by_localization"].keys(), key=int
+    )
+    _options = {f"Localization {_loc}": _loc for _loc in _locs}
+    _default = f"Localization {_locs[0]}"
+    loc_pick = mo.ui.radio(
+        options=_options,
+        value=_default,
+        label="Localization strength",
+    )
+    loc_pick
+    return (loc_pick,)
+
+
+@app.cell
+def _(
+    AW_LIST,
+    FIG2C,
+    PAPER_COLORS,
+    PAPER_FIG2C,
+    RLCT_SIZES,
+    alt,
+    loc_pick,
+    mo,
+):
+    _df = FIG2C[FIG2C["localization"] == loc_pick.value].copy()
+    _domain = [f"AW={_a}" for _a in AW_LIST]
+    _scale = alt.Scale(
+        domain=_domain,
+        range=[PAPER_COLORS[_a] for _a in AW_LIST],
+    )
+    _order = RLCT_SIZES
+    _y_domain = [
+        float(min(_df["lo"].min(), PAPER_FIG2C["paper"].min()))
+        - 3.0,
+        float(max(_df["hi"].max(), PAPER_FIG2C["paper"].max()))
+        + 3.0,
+    ]
+    _x = alt.X(
+        "hidden:O",
+        title="Hidden size",
+        sort=_order,
+        axis=alt.Axis(labelAngle=0),
+    )
+    _band = (
+        alt.Chart(_df)
+        .mark_area(opacity=0.16)
+        .encode(
+            x=_x,
+            y=alt.Y(
+                "lo:Q",
+                title="LLC estimate",
+                scale=alt.Scale(domain=_y_domain, zero=False),
+            ),
+            y2="hi:Q",
+            color=alt.Color("curve:N", scale=_scale, legend=None),
+        )
+    )
+    _line = (
+        alt.Chart(_df)
+        .mark_line(strokeWidth=2)
+        .encode(
+            x=_x,
+            y=alt.Y(
+                "mean:Q",
+                scale=alt.Scale(domain=_y_domain, zero=False),
+            ),
+            color=alt.Color(
+                "curve:N",
+                scale=_scale,
+                legend=alt.Legend(title="AW"),
+            ),
+            tooltip=[
+                alt.Tooltip("hidden:O"),
+                alt.Tooltip("curve:N"),
+                alt.Tooltip("mean:Q", format=".2f"),
+                alt.Tooltip("ci:Q", title="+/- CI", format=".2f"),
+            ],
+        )
+    )
+    _points = (
+        alt.Chart(PAPER_FIG2C)
+        .mark_point(filled=False, strokeWidth=1.6, size=70)
+        .encode(
+            x=_x,
+            y=alt.Y(
+                "paper:Q",
+                scale=alt.Scale(domain=_y_domain, zero=False),
+            ),
+            color=alt.Color("curve:N", scale=_scale, legend=None),
+            tooltip=[
+                alt.Tooltip("curve:N"),
+                alt.Tooltip("paper:Q", title="paper", format=".2f"),
+            ],
+        )
+    )
+    _chart = (
+        _band + _line + _points
+    ).properties(
+        width=620,
+        height=360,
+        title=f"LLC at localization {loc_pick.value}",
+    )
+    mo.vstack(
+        [
+            mo.ui.altair_chart(_chart),
+            mo.md(
+                "Hollow points are the values read off the paper's "
+                "Figure 2C. Bands are the mean +/- 95% CI half-width "
+                "over 10 seeded models."
+            ),
+        ]
+    )
+    return
+
+
+@app.cell
+def _(FIG2C, PAPER_FIG2C, RLCT_SIZES, mo):
+    _loc = "100"
+    _ours = FIG2C[FIG2C["localization"] == _loc].set_index(
+        ["aw", "hidden"]
+    )
+    _paper = PAPER_FIG2C.set_index(["aw", "hidden"])["paper"]
+
+    _rel = []
+    for _key, _row in _ours.iterrows():
+        _p = float(_paper.loc[_key])
+        if _row["mean"] > 1 and _p > 1:
+            _rel.append(abs(_row["mean"] - _p) / abs(_p))
+    _worst = max(_rel)
+
+    _aw0 = {
+        _s: float(_ours.loc[(0, _s), "mean"]) for _s in RLCT_SIZES
+    }
+    _collapsed_lines = []
+    for (_aw, _size), _row in _ours.iterrows():
+        if _row["mean"] < 1:
+            _collapsed_lines.append(
+                f"- AW = {_aw} at hidden {_size}: "
+                f"**{_row['mean']:.1f}** "
+                f"(95% CI +/- {_row['ci']:.1f})"
+            )
+    _collapsed = "\n".join(_collapsed_lines)
+
+    _prose = mo.md(f"""
+    At localization 100 our estimates land within about
+    {_worst:.0%} of the paper at every setting where both are well
+    above zero. RLCT rises with hidden size at every AW (at AW = 0
+    it climbs from {_aw0[RLCT_SIZES[0]]:.1f} at hidden
+    {RLCT_SIZES[0]} to {_aw0[RLCT_SIZES[-1]]:.1f} at hidden
+    {RLCT_SIZES[-1]}), and it falls as AW grows at every size. Both
+    directions point the same way: more self-prediction and smaller
+    networks mean fewer effective parameters.
+
+    The exceptions are the collapsed settings, where the
+    self-prediction term swamps classification:
+
+    {_collapsed}
+
+    Negative or near-zero values with wide intervals, matching the
+    paper's own plunge (its hollow points there sit at -4, -5 and
+    -16).
+    """)
+    _prose
+    return
+
+
+@app.cell
+def _(FIG2C, RLCT_RAW, RLCT_SIZES, mo):
+    _h = RLCT_RAW["by_localization"]["100"]["hyperparams"]
+    _v = RLCT_RAW["by_localization"]["100"]["validation"]
+    _anchor = {
+        (_row["localization"], _row["hidden"]): float(_row["mean"])
+        for _row in FIG2C[FIG2C["aw"] == 0].to_dict("records")
+    }
+    _ratio = max(
+        _anchor[("100", _s)] / _anchor[("1000", _s)]
+        for _s in RLCT_SIZES
+    )
+    mo.md(f"""
+    /// admonition | Reproduction note: which localization?
+    The paper's supplement says its MNIST LLC runs used
+    localization 1000, but the caption of its own
+    localization-calibration figure says 100. The choice changes
+    the level. At 1000 our estimates come out up to about
+    {_ratio:.0f}x lower than the paper's, with the same ordering;
+    at 100 they line up. On pilot models (H=512, AW 0), going
+    from 200 to 4000 draws at localization 1000 moved the
+    estimate only from 8.5 to 8.7.
+
+    We estimate with a batched SGLD sampler validated against
+    devinterp {_h['devinterp_version']} (worst relative difference
+    {_v['worst_rel_diff']:.1%} on the pilot models). Settings:
+    {_h['num_chains']} chains x {_h['num_draws']} draws, nbeta =
+    {_h['nbeta']:.1f} (512/log 512), learning rate {_h['lr']:g}.
     ///
     """)
     return
