@@ -117,7 +117,8 @@ def _(mo):
 
 
 @app.cell
-def _(mo):
+def _(device, mo):
+    _compile_default = device.type == "cuda"
     aws = mo.ui.multiselect(
         options=[0, 0.5, 1, 2],
         value=[0, 0.5, 1, 2],
@@ -135,9 +136,19 @@ def _(mo):
         value=False, label="Smoke test (2 epochs, 1 seed, 2000 images)"
     )
     train_button = mo.ui.run_button(label="Train")
+    compile_flag = mo.ui.checkbox(
+        value=_compile_default, label="torch.compile"
+    )
+    compile_mode = mo.ui.dropdown(
+        options=["reduce-overhead", "max-autotune"],
+        value="reduce-overhead",
+        label="Compile mode",
+    )
     return (
         aws,
         checkpoint_every,
+        compile_flag,
+        compile_mode,
         concurrent,
         epochs,
         seeds,
@@ -150,6 +161,8 @@ def _(mo):
 def _(
     aws,
     checkpoint_every,
+    compile_flag,
+    compile_mode,
     concurrent,
     epochs,
     mo,
@@ -165,12 +178,17 @@ def _(
     one ResNet-18 for the chosen number of epochs. `len(AW) * seeds` runs are
     interleaved in groups of *Concurrent runs*; finished runs are skipped on
     restart.
+
+    `torch.compile` defaults on for CUDA and off elsewhere; `reduce-overhead`
+    captures CUDA graphs (fastest for this fixed-shape loop) and `max-autotune`
+    spends longer tuning kernels for a possibly better steady state.
     """
     )
     mo.vstack(
         [
             mo.hstack([aws, seeds], justify="start", gap=2),
             mo.hstack([epochs, concurrent, checkpoint_every], justify="start", gap=2),
+            mo.hstack([compile_flag, compile_mode], justify="start", gap=2),
             mo.hstack([smoke, train_button], justify="start", gap=2),
         ]
     )
@@ -181,6 +199,8 @@ def _(
 def _(
     aws,
     checkpoint_every,
+    compile_flag,
+    compile_mode,
     concurrent,
     epochs,
     mo,
@@ -199,6 +219,8 @@ def _(
     eff_epochs = 2 if smoke_test else int(epochs.value)
     eff_concurrent = 1 if smoke_test else int(concurrent.value)
     eff_ckpt_every = 1 if smoke_test else int(checkpoint_every.value)
+    eff_compile = bool(compile_flag.value)
+    eff_compile_mode = str(compile_mode.value)
 
     if _script:
         _env_aws = os.environ.get("CIFAR_AWS", "")
@@ -222,11 +244,21 @@ def _(
                 eff_concurrent = int(_value)
             else:
                 eff_ckpt_every = int(_value)
+        _compile_env = os.environ.get("CIFAR_COMPILE")
+        if _compile_env is not None:
+            eff_compile = _compile_env.strip().lower() not in (
+                "", "0", "false", "off", "no"
+            )
+        _compile_mode_env = os.environ.get("CIFAR_COMPILE_MODE")
+        if _compile_mode_env:
+            eff_compile_mode = _compile_mode_env.strip()
 
     train_clicked = bool(train_button.value) or _script
     return (
         eff_aws,
         eff_ckpt_every,
+        eff_compile,
+        eff_compile_mode,
         eff_concurrent,
         eff_epochs,
         eff_seeds,
@@ -452,6 +484,36 @@ def _(
             return torch.autocast(device_type="cuda", dtype=torch.bfloat16)
         return contextlib.nullcontext()
 
+    def strip_orig_mod(state_dict):
+        """Drop the '_orig_mod.' prefix added by torch.compile wrappers.
+
+        Let an uncompiled run resume a checkpoint saved from a compiled model
+        (or the reverse) without a key mismatch.
+        """
+        prefix = "_orig_mod."
+        return {
+            key.removeprefix(prefix): value
+            for key, value in state_dict.items()
+        }
+
+    def build_train_step(model, aw, compile_enabled, compile_mode):
+        """Forward + classification + self-model loss for one batch.
+
+        `dynamic=False` keeps each batch shape on its own static graph; the
+        last partial batch (336 images) therefore costs one extra graph but
+        stays in training instead of being dropped.
+        """
+
+        def step(xb, yb):
+            logits, a_hat, a = model(xb)
+            ce = F.cross_entropy(logits, yb)
+            sm = (a_hat - a.detach()).pow(2).mean()
+            return ce + aw * sm
+
+        if not compile_enabled:
+            return step
+        return torch.compile(step, mode=compile_mode, dynamic=False)
+
     @torch.no_grad()
     def test_accuracy(model, X, y, mean, std, batch_size=BATCH_SIZE):
         model.eval()
@@ -500,6 +562,13 @@ def _(
         ckpt_every = max(1, int(cfg["ckpt_every"]))
         smoke = cfg["smoke"]
         ckpt_dir = Path(cfg["ckpt_dir"])
+        compile_enabled = bool(cfg.get("compile", False))
+        compile_mode = str(cfg.get("compile_mode", "reduce-overhead"))
+        use_cudagraphs = (
+            compile_enabled
+            and compile_mode == "reduce-overhead"
+            and device.type == "cuda"
+        )
 
         X_train, y_train, X_test, y_test, mean, std = load_cifar(
             device,
@@ -527,6 +596,7 @@ def _(
                             "aw": aw,
                             "seed": seed,
                             "model": None,
+                            "train_step": None,
                             "optimizer": None,
                             "generator": None,
                             "history": checkpoint["history"],
@@ -540,11 +610,18 @@ def _(
                     continue
 
                 model = build_model(seed, device)
-                optimizer = torch.optim.Adam(model.parameters(), lr=LR)
+                optimizer = torch.optim.Adam(
+                    model.parameters(), lr=LR, fused=device.type == "cuda"
+                )
+                train_step = build_train_step(
+                    model, aw, compile_enabled, compile_mode
+                )
                 generator = torch.Generator()
                 resumed = checkpoint is not None
                 if resumed:
-                    model.load_state_dict(checkpoint["model"])
+                    model.load_state_dict(
+                        strip_orig_mod(checkpoint["model"])
+                    )
                     optimizer.load_state_dict(checkpoint["optimizer"])
                     generator.set_state(checkpoint["generator"])
                     history = checkpoint["history"]
@@ -559,6 +636,7 @@ def _(
                         "aw": aw,
                         "seed": seed,
                         "model": model,
+                        "train_step": train_step,
                         "optimizer": optimizer,
                         "generator": generator,
                         "history": history,
@@ -609,17 +687,17 @@ def _(
                                         memory_format=torch.channels_last
                                     )
                                 yb = y_train[index]
-                                with autocast_context(device):
-                                    logits, a_hat, a = s["model"](xb)
-                                    ce = F.cross_entropy(logits, yb)
-                                    sm = (a_hat - a.detach()).pow(2).mean()
-                                    loss = ce + s["aw"] * sm
                                 s["optimizer"].zero_grad(set_to_none=True)
+                                if use_cudagraphs:
+                                    torch.compiler.cudagraph_mark_step_begin()
+                                with autocast_context(device):
+                                    loss = s["train_step"](xb, yb)
                                 loss.backward()
                                 s["optimizer"].step()
                         if device.type == "mps":
                             torch.mps.synchronize()
                         elapsed = time.perf_counter() - start
+                        per_model_seconds = elapsed / len(step_states)
                         for s in step_states:
                             accuracy = test_accuracy(
                                 s["model"], X_test, y_test, mean, std
@@ -627,9 +705,14 @@ def _(
                             s["history"]["sd"].append(classifier_sd(s["model"]))
                             s["history"]["test_acc"].append(accuracy)
                             s["epoch"] = epoch
-                            s["epoch_seconds"].append(elapsed / len(step_states))
+                            s["epoch_seconds"].append(per_model_seconds)
                             finished = epoch >= epochs
                             if epoch % ckpt_every == 0 or finished:
+                                print(
+                                    f"{s['key']} epoch {epoch}/{epochs} | "
+                                    f"{per_model_seconds:.2f} s/epoch | "
+                                    f"acc={accuracy:.4f}"
+                                )
                                 save_checkpoint(
                                     s["path"], s["aw"], s["seed"], epoch,
                                     epochs, s["model"], s["optimizer"],
@@ -644,6 +727,7 @@ def _(
                             bar.update(
                                 subtitle=(
                                     f"{s['key']} epoch {epoch}/{epochs} | "
+                                    f"{per_model_seconds:.2f} s/epoch | "
                                     f"{done}/{total_steps} run-epochs"
                                 )
                             )
@@ -705,6 +789,8 @@ def _(
                 "lr": LR,
                 "optimizer": "adam",
                 "weight_decay": 0.0,
+                "torch_compile": compile_enabled,
+                "compile_mode": compile_mode if compile_enabled else None,
                 "concurrent_runs": concurrent,
                 "checkpoint_interval": ckpt_every,
                 "checkpoint_dir": str(ckpt_dir),
@@ -734,6 +820,8 @@ def _(
     device_name,
     eff_aws,
     eff_ckpt_every,
+    eff_compile,
+    eff_compile_mode,
     eff_concurrent,
     eff_epochs,
     eff_seeds,
@@ -753,13 +841,18 @@ def _(
                 "concurrent": eff_concurrent,
                 "ckpt_every": eff_ckpt_every,
                 "smoke": smoke_test,
+                "compile": eff_compile,
+                "compile_mode": eff_compile_mode,
                 "device": device,
                 "device_name": device_name,
                 "ckpt_dir": checkpoint_dir,
             }
         )
         _elapsed = time.perf_counter() - _start
-        print(f"device: {device} ({device_name})")
+        _compile_note = (
+            f"compile={eff_compile_mode}" if eff_compile else "compile=off"
+        )
+        print(f"device: {device} ({device_name}) | {_compile_note}")
         print(f"total wall time: {_elapsed:.1f}s")
         print(f"checkpoints: {checkpoint_dir}")
         for _key, _record in fig3["runs"].items():
