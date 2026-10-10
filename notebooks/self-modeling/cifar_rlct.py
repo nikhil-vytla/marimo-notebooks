@@ -106,10 +106,14 @@ def _(device, device_name, mo):
       directly. `epoch 250` is the final checkpoint.
     - **Loss.** Mean cross-entropy on the CIFAR-10 **train** split with the
       same per-channel normalization as training and **no augmentation**.
-    - **BatchNorm.** Sampling keeps the network in `eval()` mode, so BatchNorm
-      uses the frozen running statistics from training. `devinterp` calls
+    - **BatchNorm.** `RLCT_BN_MODE=eval` (default) keeps the network in
+      `eval()` mode, so BatchNorm uses the frozen running statistics from
+      training and they never drift during sampling. `devinterp` calls
       `model.train()` internally; the model class overrides `train()` to force
-      `eval()` so the running stats never drift during sampling.
+      `eval()`. `RLCT_BN_MODE=train` instead lets `train()` take effect, so
+      BatchNorm uses per-minibatch statistics during both SGLD sampling and
+      the init-loss computation (as when `devinterp` is handed a model left
+      in train mode); its running statistics may update.
     - **Precision.** bf16 autocast on CUDA (devinterp's custom `loss_fn`
       lets us wrap the forward pass); fp32 on MPS/CPU.
     - **Localization.** Default `100`: the paper's supplement text says `1000`
@@ -194,8 +198,9 @@ def _(
     class CifarResNet18Pruned(nn.Module):
         """ResNet-18 + hidden 2000, classifier rows only (10 logits)."""
 
-        def __init__(self):
+        def __init__(self, bn_mode="eval"):
             super().__init__()
+            self.bn_mode = bn_mode
             self.stem = nn.Sequential(
                 nn.Conv2d(3, 64, 3, stride=1, padding=1, bias=False),
                 nn.BatchNorm2d(64),
@@ -217,8 +222,10 @@ def _(
             return nn.Sequential(*layers)
 
         def train(self, mode=True):
-            # devinterp calls model.train(); keep BatchNorm frozen.
-            return super().train(False)
+            # devinterp calls model.train(); force eval unless bn_mode="train".
+            if self.bn_mode == "eval":
+                return super().train(False)
+            return super().train(mode)
 
         def forward(self, x):
             x = self.stem(x)
@@ -278,9 +285,9 @@ def _(
         std = var.sqrt().float().view(1, 3, 1, 1).to(device)
         return X, y, mean, std
 
-    def load_pruned_model(path, device):
+    def load_pruned_model(path, device, bn_mode="eval"):
         state = torch.load(path, map_location="cpu", weights_only=True)
-        model = CifarResNet18Pruned()
+        model = CifarResNet18Pruned(bn_mode=bn_mode)
         model.load_state_dict(state)
         model.eval()
         return model.to(device)
@@ -345,6 +352,7 @@ def _(
         "llc_weight_decay": 0.0,
         "bounding_box_size": None,
         "sampling_method": "sgmcmc_sgld",
+        "bn_mode": "eval",
         "gradient_accumulation_steps": 1,
         "shuffle": True,
         "match_sampling_input_ids_across_chains": True,
@@ -390,6 +398,7 @@ def _(
         noise_level,
         llc_weight_decay,
         sampling_method,
+        bn_mode,
         init_loss_batches,
     ):
         """Run devinterp's llc() once for one pruned checkpoint."""
@@ -397,7 +406,7 @@ def _(
 
         device = torch.device(device_type)
         X, y, mean, std = load_cifar_train(device, subset_n)
-        model = load_pruned_model(Path(path_str), device)
+        model = load_pruned_model(Path(path_str), device, bn_mode)
         dataset = IndexDataset(y)
         channels_last = device.type == "cuda"
 
@@ -488,6 +497,7 @@ def _(
         noise_level,
         llc_weight_decay,
         sampling_method,
+        bn_mode,
         init_loss_batches,
     ):
         return estimate_model(
@@ -509,6 +519,7 @@ def _(
             noise_level,
             llc_weight_decay,
             sampling_method,
+            bn_mode,
             init_loss_batches,
         )
 
@@ -540,7 +551,7 @@ def _(
                 return int(draws)
         return None
 
-    def rlct_hyperparams(device_type, subset_n):
+    def rlct_hyperparams(device_type, subset_n, bn_mode):
         return {
             "devinterp_version": importlib.metadata.version("devinterp"),
             "estimator": "devinterp.slt.llc.llc",
@@ -553,7 +564,13 @@ def _(
                 "CIFAR ResNet-18 + hidden 2000, classifier rows only"
             ),
             "epoch": 250,
-            "batchnorm": "eval mode, frozen running stats",
+            "bn_mode": bn_mode,
+            "batchnorm": (
+                "eval mode, frozen running stats"
+                if bn_mode == "eval"
+                else "train mode, per-minibatch statistics "
+                "(running stats may update)"
+            ),
             "lr": RLCT_CONFIG["lr"],
             "localization": RLCT_CONFIG["localization"],
             "localization_note": RLCT_CONFIG["localization_note"],
@@ -625,7 +642,37 @@ def _(RLCT_CONFIG, mo, os):
     _env_subset = os.environ.get("RLCT_SUBSET", "").strip()
     subset_n = int(_env_subset) if _env_subset else None
 
-    _env_draws = os.environ.get("RLCT_DRAWS", "").strip()
+    _env_bn = os.environ.get("RLCT_BN_MODE", "").strip().lower()
+    bn_mode = (
+        _env_bn if _env_bn in ("eval", "train") else RLCT_CONFIG["bn_mode"]
+    )
+    RLCT_CONFIG["bn_mode"] = bn_mode
+
+    _env_cal_locs = os.environ.get("RLCT_CAL_LOCS", "").strip()
+    calibration_localizations = (
+        tuple(
+            float(part)
+            for part in _env_cal_locs.split(",")
+            if part.strip()
+        )
+        if _env_cal_locs
+        else RLCT_CONFIG["calibration_localizations"]
+    )
+
+    _env_cal_models = os.environ.get("RLCT_CAL_MODELS", "").strip()
+    calibration_models = (
+        tuple(
+            part.strip()
+            for part in _env_cal_models.split(",")
+            if part.strip()
+        )
+        if _env_cal_models
+        else None
+    )
+
+    _env_draws = os.environ.get("RLCT_CAL_DRAWS", "").strip()
+    if not _env_draws:
+        _env_draws = os.environ.get("RLCT_DRAWS", "").strip()
     if _env_draws:
         calibration_draws = tuple(
             int(part) for part in _env_draws.split(",") if part.strip()
@@ -666,20 +713,29 @@ def _(RLCT_CONFIG, mo, os):
             run_button,
             mo.md(
                 f"**Mode:** `{selected_mode}` · **subset:** `{subset_n}` · "
+                f"**BatchNorm:** `{bn_mode}` · "
+                f"**calibration localizations:** "
+                f"`{calibration_localizations}` · "
                 f"**calibration draws:** `{calibration_draws}` · "
                 f"**calibration chains:** `{calibration_chains}` · "
+                f"**calibration models:** `{calibration_models}` · "
                 f"**sweep draws:** `{sweep_draws}` · "
                 f"**sweep chains:** `{sweep_chains}`\n\n"
-                "Set `RLCT_MODE`, `RLCT_SUBSET`, `RLCT_DRAWS`, "
-                "`RLCT_CHAINS`, `RLCT_SWEEP_DRAWS`, `RLCT_SWEEP_CHAINS`, "
-                "and `RLCT_OUT` to drive this headlessly."
+                "Set `RLCT_MODE`, `RLCT_SUBSET`, `RLCT_BN_MODE`, "
+                "`RLCT_DRAWS`, `RLCT_CAL_LOCS`, `RLCT_CAL_DRAWS`, "
+                "`RLCT_CAL_MODELS`, `RLCT_CHAINS`, `RLCT_SWEEP_DRAWS`, "
+                "`RLCT_SWEEP_CHAINS`, and `RLCT_OUT` to drive this "
+                "headlessly."
             ),
         ]
     )
     _out
     return (
+        bn_mode,
         calibration_chains,
         calibration_draws,
+        calibration_localizations,
+        calibration_models,
         run_requested,
         selected_mode,
         subset_n,
@@ -691,8 +747,11 @@ def _(RLCT_CONFIG, mo, os):
 @app.cell
 def _(
     RLCT_CONFIG,
+    bn_mode,
     calibration_chains,
     calibration_draws,
+    calibration_localizations,
+    calibration_models,
     device,
     estimate_model,
     file_fingerprint,
@@ -712,7 +771,14 @@ def _(
         }
         _results = {}
         _lines = []
-        for _key, _aw, _seed in RLCT_CONFIG["calibration_pairs"]:
+        _pairs = RLCT_CONFIG["calibration_pairs"]
+        if calibration_models is not None:
+            _pairs = tuple(
+                _pair
+                for _pair in _pairs
+                if _pair[0] in calibration_models
+            )
+        for _key, _aw, _seed in _pairs:
             _m = _by_key.get(_key)
             if _m is None:
                 raise FileNotFoundError(
@@ -721,7 +787,7 @@ def _(
                 )
             _fp = file_fingerprint(_m["path"])
             _per_loc = {}
-            for _loc in RLCT_CONFIG["calibration_localizations"]:
+            for _loc in calibration_localizations:
                 _per_draws = {}
                 for _draws in calibration_draws:
                     _entry = estimate_model(
@@ -743,6 +809,7 @@ def _(
                         RLCT_CONFIG["noise_level"],
                         RLCT_CONFIG["llc_weight_decay"],
                         RLCT_CONFIG["sampling_method"],
+                        bn_mode,
                         init_batches(subset_n),
                     )
                     _per_draws[str(_draws)] = {
@@ -763,9 +830,9 @@ def _(
             "device": device.type,
             "subset": subset_n,
             "num_chains": calibration_chains,
+            "bn_mode": bn_mode,
             "localizations": [
-                float(_loc)
-                for _loc in RLCT_CONFIG["calibration_localizations"]
+                float(_loc) for _loc in calibration_localizations
             ],
             "num_draws": [int(_d) for _d in calibration_draws],
             "plateau_tolerance": RLCT_CONFIG["plateau_tolerance"],
@@ -793,6 +860,7 @@ def _(
 @app.cell
 def _(
     RLCT_CONFIG,
+    bn_mode,
     device,
     estimate_model_cached,
     file_fingerprint,
@@ -838,6 +906,7 @@ def _(
                         RLCT_CONFIG["noise_level"],
                         RLCT_CONFIG["llc_weight_decay"],
                         RLCT_CONFIG["sampling_method"],
+                        bn_mode,
                         init_batches(subset_n),
                     )
                     _entries.append(_entry)
@@ -887,6 +956,7 @@ def _(
 @app.cell
 def _(
     Path,
+    bn_mode,
     calibration,
     device,
     json,
@@ -925,7 +995,9 @@ def _(
                     _prior_cal = None
             _payload = {
                 "rlct": rlct,
-                "hyperparams": rlct_hyperparams(device.type, subset_n),
+                "hyperparams": rlct_hyperparams(
+                    device.type, subset_n, bn_mode
+                ),
                 "calibration": (
                     calibration if calibration is not None else _prior_cal
                 ),
