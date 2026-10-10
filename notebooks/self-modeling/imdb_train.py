@@ -160,6 +160,11 @@ def _(aws, epochs, mo, os, seeds, smoke, train_button):
     eff_aws = [float(a) for a in aws.value]
     eff_seeds = 2 if smoke_test else int(seeds.value)
     eff_epochs = 2 if smoke_test else int(epochs.value)
+    # Script-mode overrides for short real runs (e.g. SM_SEEDS=10 SM_EPOCHS=3).
+    if _script and os.environ.get("SM_SEEDS"):
+        eff_seeds = int(os.environ["SM_SEEDS"])
+    if _script and os.environ.get("SM_EPOCHS"):
+        eff_epochs = int(os.environ["SM_EPOCHS"])
     train_clicked = bool(train_button.value) or _script
     return eff_aws, eff_epochs, eff_seeds, smoke_test, train_clicked
 
@@ -225,6 +230,11 @@ def _(re, torch):
     def pack_batch(flat_ids, flat_offsets, idx, vocab_size):
         """Pack a (M, B) batch of review indices for a single embedding_bag call.
 
+        Runs on the CPU (all arguments are integer tensors); the caller moves the
+        returned packed ids and offsets to the training device. Doing the int64
+        gather/repeat_interleave here keeps them off the MPS command buffer, where
+        a faulted kernel used to return garbage and make the lengths negative.
+
         Token ids are shifted by ``model * vocab_size`` so one flat table holds one
         embedding table per model. Returns ``(packed_token_ids, bag_offsets)``.
         """
@@ -232,8 +242,18 @@ def _(re, torch):
         _bag = idx.reshape(-1)
         _starts = flat_offsets[_bag]
         _lengths = flat_offsets[_bag + 1] - _starts
+        _bad = _lengths < 0
+        assert not bool(_bad.any()), (
+            "pack_batch: negative review length "
+            f"({int(_bad.sum())} of {_lengths.numel()} bags, "
+            f"min={int(_lengths.min())}); flat_offsets must be "
+            "monotonically non-decreasing and idx must index existing bags"
+        )
         _total = int(_lengths.sum())
         _excl = _lengths.cumsum(0) - _lengths
+        assert bool((_excl[1:] >= _excl[:-1]).all()), (
+            "pack_batch: bag offsets are not monotonically non-decreasing"
+        )
         _pos = torch.arange(_total, device=flat_ids.device)
         _src = (
             _starts.repeat_interleave(_lengths)
@@ -316,11 +336,13 @@ def _(C, D, F, H, nn, pack_batch, torch):
         with torch.no_grad():
             for lo in range(0, n, 512):
                 hi = min(lo + 512, n)
-                idx = torch.arange(lo, hi, device=device)
+                idx = torch.arange(lo, hi)
                 idx = idx.unsqueeze(0).expand(M, hi - lo)
                 packed, offsets = pack_batch(
                     flat_ids, flat_offsets, idx, vocab_size
                 )
+                packed = packed.to(device)
+                offsets = offsets.to(device)
                 logits, _, _ = forward_batched(
                     params, packed, offsets, M, hi - lo
                 )
@@ -437,11 +459,13 @@ def _(
         vocab_size = data["vocab_info"]["size"]
         device = torch.device(device_type)
 
-        train_ids = data["train_ids"].to(device)
-        train_offsets = data["train_offsets"].to(device)
+        # Integer data stays on the CPU; pack_batch runs there and only the
+        # packed token ids and offsets are moved to the training device.
+        train_ids = data["train_ids"]
+        train_offsets = data["train_offsets"]
         train_labels = data["train_labels"].to(device)
-        test_ids = data["test_ids"].to(device)
-        test_offsets = data["test_offsets"].to(device)
+        test_ids = data["test_ids"]
+        test_offsets = data["test_offsets"]
         test_labels = data["test_labels"].to(device)
         N = train_labels.numel()
 
@@ -479,7 +503,7 @@ def _(
                 gens[m].manual_seed(seeds[m] * 1000 + epoch)
             perms = torch.stack(
                 [torch.randperm(N, generator=gens[m]) for m in range(M)]
-            ).to(device)
+            )
 
             if device.type == "mps":
                 torch.mps.synchronize()
@@ -491,7 +515,9 @@ def _(
                 packed, offsets = pack_batch(
                     train_ids, train_offsets, idx, vocab_size
                 )
-                yb = train_labels[idx]
+                packed = packed.to(device)
+                offsets = offsets.to(device)
+                yb = train_labels[idx.to(device)]
                 logits, a_hat, a = forward_batched(
                     params, packed, offsets, M, hi - lo
                 )
