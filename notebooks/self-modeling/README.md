@@ -12,6 +12,7 @@ Reproduction of [Unexpected Benefits of Self-Modeling in Neural Systems](https:/
 - `self_modeling_essay.py` — visual essay; reads `public/data/`; saved outputs in `__marimo__/session/`.
 - `self_modeling_train.py` — GPU notebook for molab; marked `# smoke: skip`; writes `public/data/mnist_fig2.json`. Its hidden-512 run reproduces the original batched trainer's epoch-50 means to 5 decimals.
 - `cifar_train.py` — GPU notebook for molab (Figure 3, CIFAR-10); marked `# smoke: skip`; writes `public/data/cifar_fig3.json` and checkpoints runs under `checkpoints/` so a restarted session resumes.
+- `cifar_rlct.py` — GPU notebook for molab (Figure 3B RLCT, CIFAR-10); marked `# smoke: skip`; reads the pruned weights in `checkpoints/pruned/run_aw<aw>_seed<seed>.pt` and writes `public/data/cifar_fig3b.json`.
 - `public/data/` — `mnist_fig2a_local.json` (CPU sweep summary for preprocessing variants `a` and `b`) and `mnist_fig2.json` (training-notebook output from the molab GPU: all four hidden sizes, 10 seeds, weight histograms).
 
 ## Corrections
