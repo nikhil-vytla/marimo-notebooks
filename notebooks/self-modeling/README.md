@@ -26,4 +26,5 @@ The original script implementation (data, model, loss, sweep, batched trainer, t
 ## Done / next
 
 - Done: Fig 2A reproduced within ~0.001; Fig 2B and 2D reproduced on the molab GPU (240 models, ~43 s of GPU time), including the accuracy collapse of small networks at large AW.
-- Next: RLCT (Fig 2C, in progress), IMDB (Fig 4), CIFAR-10 (Fig 3, ~4–6 h on molab GPU).
+- Done: Fig 2C (RLCT) at localization 100 matches the paper within a few percent; localization 1000 (the supplement's text value) is ~7x lower with the same ordering. Estimated with a batched SGLD sampler validated against devinterp 2.0.1; results in `public/data/mnist_fig2c.json`.
+- Next: IMDB (Fig 4), CIFAR-10 (Fig 3, ~4–6 h on molab GPU).
