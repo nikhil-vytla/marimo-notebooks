@@ -20,6 +20,7 @@ app = marimo.App(width="medium")
 @app.cell
 def _():
     import json
+    import math
     import os
     import re
     import time
@@ -42,6 +43,7 @@ def _():
         alt,
         json,
         load_dataset,
+        math,
         mo,
         nn,
         np,
@@ -113,7 +115,7 @@ def _(mo):
 
 
 @app.cell
-def _(mo):
+def _(BATCH, DETACH_TARGET, GRAD_CLIP, mo):
     aws = mo.ui.multiselect(
         options=[0, 100, 500],
         value=[0, 100, 500],
@@ -121,29 +123,75 @@ def _(mo):
     )
     seeds = mo.ui.number(value=10, start=1, stop=50, label="Seeds")
     epochs = mo.ui.number(value=500, start=1, stop=2000, label="Epochs")
+    batch = mo.ui.number(
+        value=BATCH, start=1, stop=4096, step=1, label="Batch size"
+    )
+    clip = mo.ui.number(
+        value=GRAD_CLIP,
+        start=0.0,
+        stop=10.0,
+        step=0.1,
+        label="Grad-norm clip (0 = off)",
+    )
+    detach = mo.ui.checkbox(
+        value=DETACH_TARGET, label="Detach self-model target"
+    )
+    out_path = mo.ui.text(
+        value="",
+        label="Output JSON path (blank = public/data/imdb_fig4.json)",
+        full_width=True,
+    )
     smoke = mo.ui.checkbox(
         value=False, label="Smoke test (2 epochs, 2 seeds)"
     )
     train_button = mo.ui.run_button(label="Train")
-    return aws, epochs, seeds, smoke, train_button
+    return (
+        aws,
+        batch,
+        clip,
+        detach,
+        epochs,
+        out_path,
+        seeds,
+        smoke,
+        train_button,
+    )
 
 
 @app.cell
-def _(aws, epochs, mo, seeds, smoke, train_button):
+def _(
+    aws,
+    batch,
+    clip,
+    detach,
+    epochs,
+    mo,
+    out_path,
+    seeds,
+    smoke,
+    train_button,
+):
     mo.md("""
     ### Configuration
 
     Each run trains `len(AW) x seeds` independent models in one batched
-    forward/backward: SGD `lr=0.1`, momentum 0, no nesterov, batch 512, 500 epochs.
+    forward/backward: SGD `lr=0.1`, momentum 0, no nesterov. Batch size, gradient
+    clipping, and target detachment are all configurable below; the defaults are
+    batch 512, clip 1.0, detached target.
 
     On CUDA all selected AWs train together (one stacked embedding table per model,
-    ~770 MB at 30 models). On MPS/CPU the groups are trained one AW at a time. The
-    global gradient norm is clipped at 1.0 so AW=500 stays finite; see the note below
-    the results.
+    ~770 MB at 30 models). On MPS/CPU the groups are trained one AW at a time.
+
+    In script mode (`SMOKE=1` or any `SM_*` variable set) the controls below are
+    overridden: `SM_BATCH`, `SM_CLIP` (`0` disables clipping), `SM_DETACH` (`0`
+    trains against the live activations), `SM_AWS` (comma-separated, e.g. `0,500`),
+    `SM_OUT` (JSON output path), `SM_SEEDS`, `SM_EPOCHS`.
     """)
     mo.vstack(
         [
             mo.hstack([aws, seeds, epochs], justify="start", gap=2),
+            mo.hstack([batch, clip, detach], justify="start", gap=2),
+            out_path,
             mo.hstack([smoke, train_button], justify="start", gap=2),
         ]
     )
@@ -151,22 +199,65 @@ def _(aws, epochs, mo, seeds, smoke, train_button):
 
 
 @app.cell
-def _(aws, epochs, mo, os, seeds, smoke, train_button):
+def _(
+    aws,
+    batch,
+    clip,
+    detach,
+    epochs,
+    mo,
+    os,
+    out_path,
+    seeds,
+    smoke,
+    train_button,
+):
     _mode = mo.app_meta().mode
     _script = _mode == "script"
     _smoke_env = os.environ.get("SMOKE") == "1"
     smoke_test = bool(smoke.value) or (_script and _smoke_env)
 
+    eff_batch = int(batch.value)
+    eff_clip = float(clip.value)
+    eff_detach = bool(detach.value)
     eff_aws = [float(a) for a in aws.value]
     eff_seeds = 2 if smoke_test else int(seeds.value)
     eff_epochs = 2 if smoke_test else int(epochs.value)
+    eff_out = str(out_path.value).strip()
+
     # Script-mode overrides for short real runs (e.g. SM_SEEDS=10 SM_EPOCHS=3).
-    if _script and os.environ.get("SM_SEEDS"):
-        eff_seeds = int(os.environ["SM_SEEDS"])
-    if _script and os.environ.get("SM_EPOCHS"):
-        eff_epochs = int(os.environ["SM_EPOCHS"])
+    if _script:
+        if os.environ.get("SM_BATCH"):
+            eff_batch = int(os.environ["SM_BATCH"])
+        if os.environ.get("SM_CLIP") is not None:
+            eff_clip = float(os.environ["SM_CLIP"])
+        if os.environ.get("SM_DETACH") is not None:
+            eff_detach = os.environ["SM_DETACH"] != "0"
+        if os.environ.get("SM_AWS"):
+            eff_aws = [
+                float(a)
+                for a in os.environ["SM_AWS"].split(",")
+                if a.strip()
+            ]
+        if os.environ.get("SM_OUT"):
+            eff_out = os.environ["SM_OUT"]
+        if os.environ.get("SM_SEEDS"):
+            eff_seeds = int(os.environ["SM_SEEDS"])
+        if os.environ.get("SM_EPOCHS"):
+            eff_epochs = int(os.environ["SM_EPOCHS"])
+
     train_clicked = bool(train_button.value) or _script
-    return eff_aws, eff_epochs, eff_seeds, smoke_test, train_clicked
+    return (
+        eff_aws,
+        eff_batch,
+        eff_clip,
+        eff_detach,
+        eff_epochs,
+        eff_out,
+        eff_seeds,
+        smoke_test,
+        train_clicked,
+    )
 
 
 @app.cell
@@ -175,6 +266,7 @@ def _(re, torch):
     LR = 0.1
     MOMENTUM = 0.0
     GRAD_CLIP = 1.0
+    DETACH_TARGET = True
     D = 64
     H = 128
     C = 2
@@ -230,10 +322,13 @@ def _(re, torch):
     def pack_batch(flat_ids, flat_offsets, idx, vocab_size):
         """Pack a (M, B) batch of review indices for a single embedding_bag call.
 
-        Runs on the CPU (all arguments are integer tensors); the caller moves the
-        returned packed ids and offsets to the training device. Doing the int64
-        gather/repeat_interleave here keeps them off the MPS command buffer, where
-        a faulted kernel used to return garbage and make the lengths negative.
+        On MPS this runs on the CPU (all arguments are integer tensors); the caller
+        moves the returned packed ids and offsets to the training device. Doing the
+        int64 gather/repeat_interleave there keeps them off the MPS command buffer,
+        where a faulted kernel used to return garbage and make the lengths negative.
+
+        On every other device (CUDA in particular) the tensors stay wherever they
+        already are, so this is a single fused device-side gather.
 
         Token ids are shifted by ``model * vocab_size`` so one flat table holds one
         embedding table per model. Returns ``(packed_token_ids, bag_offsets)``.
@@ -270,6 +365,7 @@ def _(re, torch):
         BATCH,
         C,
         D,
+        DETACH_TARGET,
         GRAD_CLIP,
         H,
         LR,
@@ -336,7 +432,7 @@ def _(C, D, F, H, nn, pack_batch, torch):
         with torch.no_grad():
             for lo in range(0, n, 512):
                 hi = min(lo + 512, n)
-                idx = torch.arange(lo, hi)
+                idx = torch.arange(lo, hi, device=flat_ids.device)
                 idx = idx.unsqueeze(0).expand(M, hi - lo)
                 packed, offsets = pack_batch(
                     flat_ids, flat_offsets, idx, vocab_size
@@ -437,15 +533,14 @@ def _(
 
 @app.cell
 def _(
-    BATCH,
     F,
-    GRAD_CLIP,
     LR,
     MOMENTUM,
     build_params,
     classifier_sd,
     evaluate_batched,
     forward_batched,
+    math,
     mo,
     pack_batch,
     prepare_imdb,
@@ -453,19 +548,35 @@ def _(
     torch,
 ):
     @mo.persistent_cache
-    def train_group(aws_list, seeds_n, epochs, device_type):
+    def train_group(
+        aws_list,
+        seeds_n,
+        epochs,
+        device_type,
+        batch_size,
+        grad_clip,
+        detach_target,
+    ):
         """Train every (aw, seed) in one AW group together; return raw per-model data."""
         data = prepare_imdb()
         vocab_size = data["vocab_info"]["size"]
         device = torch.device(device_type)
 
-        # Integer data stays on the CPU; pack_batch runs there and only the
-        # packed token ids and offsets are moved to the training device.
-        train_ids = data["train_ids"]
-        train_offsets = data["train_offsets"]
+        # On CUDA the integer data and the packing gather stay on the device. On
+        # MPS (and CPU) they stay on the host: the CPU pack_batch workaround keeps
+        # the int64 gather/repeat_interleave off the MPS command buffer, where a
+        # faulted kernel used to return garbage and make the lengths negative.
+        if device.type == "cuda":
+            train_ids = data["train_ids"].to(device)
+            train_offsets = data["train_offsets"].to(device)
+            test_ids = data["test_ids"].to(device)
+            test_offsets = data["test_offsets"].to(device)
+        else:
+            train_ids = data["train_ids"]
+            train_offsets = data["train_offsets"]
+            test_ids = data["test_ids"]
+            test_offsets = data["test_offsets"]
         train_labels = data["train_labels"].to(device)
-        test_ids = data["test_ids"]
-        test_offsets = data["test_offsets"]
         test_labels = data["test_labels"].to(device)
         N = train_labels.numel()
 
@@ -487,12 +598,52 @@ def _(
 
         sd_hist = [[] for _ in range(M)]
         acc_hist = [[] for _ in range(M)]
+        diverged_epoch = [None] * M
         epoch_seconds = []
 
         init_sd = classifier_sd(params, M).tolist()
         for m in range(M):
             sd_hist[m].append(init_sd[m])
 
+        def mark_diverged(state, alive_mask, epoch):
+            for m in range(M):
+                if bool(state[m]) and diverged_epoch[m] is None:
+                    diverged_epoch[m] = epoch
+            return alive_mask & ~state
+
+        def sanitize_grads(alive_mask):
+            # A dead model can still emit NaN/inf gradients (0 upstream times a
+            # NaN local Jacobian). Replace non-finite grads with zero and drop
+            # the dead rows entirely before the global-norm clip, otherwise one
+            # bad model would poison every other model's gradient.
+            _emb_g = params["emb"].grad
+            if _emb_g is not None:
+                _emb_g.nan_to_num_(nan=0.0, posinf=0.0, neginf=0.0)
+                _emb_g.view(M, vocab_size, -1)[~alive_mask] = 0.0
+            for _key in ("Wh", "bh", "Wo", "bo"):
+                _g = params[_key].grad
+                if _g is not None:
+                    _g.nan_to_num_(nan=0.0, posinf=0.0, neginf=0.0)
+                    _g[~alive_mask] = 0.0
+
+        def finite_weights():
+            with torch.no_grad():
+                _ok = torch.ones(M, dtype=torch.bool, device=device)
+                for m in range(M):
+                    _ok[m] = (
+                        torch.isfinite(
+                            params["emb"][
+                                m * vocab_size : (m + 1) * vocab_size
+                            ]
+                        ).all()
+                        & torch.isfinite(params["Wh"][m]).all()
+                        & torch.isfinite(params["bh"][m]).all()
+                        & torch.isfinite(params["Wo"][m]).all()
+                        & torch.isfinite(params["bo"][m]).all()
+                    )
+                return _ok
+
+        alive = torch.ones(M, dtype=torch.bool, device=device)
         for epoch in mo.status.progress_bar(
             range(1, epochs + 1),
             title=f"AW={aws_list}",
@@ -504,19 +655,22 @@ def _(
             perms = torch.stack(
                 [torch.randperm(N, generator=gens[m]) for m in range(M)]
             )
+            if device.type == "cuda":
+                perms = perms.to(device)
 
             if device.type == "mps":
                 torch.mps.synchronize()
             start = time.perf_counter()
 
-            for lo in range(0, N, BATCH):
-                hi = min(lo + BATCH, N)
+            for lo in range(0, N, batch_size):
+                hi = min(lo + batch_size, N)
                 idx = perms[:, lo:hi]
                 packed, offsets = pack_batch(
                     train_ids, train_offsets, idx, vocab_size
                 )
-                packed = packed.to(device)
-                offsets = offsets.to(device)
+                if device.type != "cuda":
+                    packed = packed.to(device)
+                    offsets = offsets.to(device)
                 yb = train_labels[idx.to(device)]
                 logits, a_hat, a = forward_batched(
                     params, packed, offsets, M, hi - lo
@@ -530,13 +684,33 @@ def _(
                     .reshape(M, -1)
                     .mean(dim=1)
                 )
-                sm = (a_hat - a.detach()).pow(2).mean(dim=(1, 2))
-                (ce + aws_t * sm).sum().backward()
-                torch.nn.utils.clip_grad_norm_(
-                    list(params.values()), GRAD_CLIP
-                )
+                target = a.detach() if detach_target else a
+                sm = (a_hat - target).pow(2).mean(dim=(1, 2))
+                loss = ce + aws_t * sm
+                finite = torch.isfinite(loss)
+                if bool((alive & ~finite).any()):
+                    alive = mark_diverged(alive & ~finite, alive, epoch)
+                safe = torch.where(alive, loss, torch.zeros_like(loss))
+                safe.sum().backward()
+                if bool((~finite).any()) or not bool(alive.all()):
+                    sanitize_grads(alive)
+                if grad_clip > 0:
+                    _norm = torch.nn.utils.clip_grad_norm_(
+                        list(params.values()), grad_clip
+                    )
+                    if not bool(torch.isfinite(_norm)):
+                        # A finite loss can still hide an inf gradient; the first
+                        # clip then turns every grad into NaN. Wipe and re-clip.
+                        sanitize_grads(alive)
+                        torch.nn.utils.clip_grad_norm_(
+                            list(params.values()), grad_clip
+                        )
                 opt.step()
                 opt.zero_grad()
+
+            weights_ok = finite_weights()
+            if bool((alive & ~weights_ok).any()):
+                alive = mark_diverged(alive & ~weights_ok, alive, epoch)
 
             sd_vec = classifier_sd(params, M)
             acc_vec = evaluate_batched(
@@ -553,8 +727,10 @@ def _(
             epoch_seconds.append(time.perf_counter() - start)
 
             for m in range(M):
-                sd_hist[m].append(sd_vec[m].item())
-                acc_hist[m].append(acc_vec[m].item())
+                _sd = sd_vec[m].item()
+                _acc = acc_vec[m].item()
+                sd_hist[m].append(_sd if math.isfinite(_sd) else 0.0)
+                acc_hist[m].append(_acc if math.isfinite(_acc) else 0.0)
 
         runs = [
             {
@@ -563,6 +739,8 @@ def _(
                 "sd": sd_hist[m],
                 "test_acc": acc_hist[m],
                 "final_acc": acc_hist[m][-1],
+                "diverged": diverged_epoch[m] is not None,
+                "diverged_epoch": diverged_epoch[m],
             }
             for m, (aw, seed) in enumerate(models)
         ]
@@ -601,6 +779,9 @@ def _(
     device,
     device_name,
     eff_aws,
+    eff_batch,
+    eff_clip,
+    eff_detach,
     eff_epochs,
     eff_seeds,
     mo,
@@ -618,7 +799,13 @@ def _(
             for _group in _groups:
                 runs.append(
                     train_group(
-                        _group, eff_seeds, eff_epochs, device.type
+                        _group,
+                        eff_seeds,
+                        eff_epochs,
+                        device.type,
+                        eff_batch,
+                        eff_clip,
+                        eff_detach,
                     )
                 )
                 _bar.update(subtitle=f"AW={_group} done")
@@ -642,11 +829,18 @@ def _(
                 _ms = [
                     m for m in _r["models"] if abs(m["aw"] - _aw) < 1e-9
                 ]
-                _sd = sum(m["sd"][-1] for m in _ms) / len(_ms)
-                _acc = sum(m["final_acc"] for m in _ms) / len(_ms)
+                _ok = [m for m in _ms if not m["diverged"]]
+                _n_div = len(_ms) - len(_ok)
+                if _ok:
+                    _sd = sum(m["sd"][-1] for m in _ok) / len(_ok)
+                    _acc = sum(m["final_acc"] for m in _ok) / len(_ok)
+                else:
+                    _sd = 0.0
+                    _acc = 0.0
                 print(
                     f"  AW={_aw:g}: final SD={_sd:.4f} "
-                    f"acc={_acc:.4f} (n={len(_ms)})"
+                    f"acc={_acc:.4f} (n={len(_ok)}, "
+                    f"diverged={_n_div})"
                 )
     else:
         runs = None
@@ -655,13 +849,14 @@ def _(
 
 @app.cell
 def _(
-    BATCH,
-    GRAD_CLIP,
     LR,
     MOMENTUM,
     device,
     device_name,
     eff_aws,
+    eff_batch,
+    eff_clip,
+    eff_detach,
     eff_epochs,
     eff_seeds,
     np,
@@ -678,37 +873,50 @@ def _(
         results = {}
         for _aw in eff_aws:
             _ms = by_aw.get(_aw, [])
-            _n = len(_ms)
+            _ok = [m for m in _ms if not m["diverged"]]
+            _n = len(_ok)
+            _n_diverged = len(_ms) - _n
             sd_mean, sd_ci = [], []
-            for _e in range(eff_epochs + 1):
-                _vals = np.asarray(
-                    [m["sd"][_e] for m in _ms], dtype=float
+            if _n:
+                for _e in range(eff_epochs + 1):
+                    _vals = np.asarray(
+                        [m["sd"][_e] for m in _ok], dtype=float
+                    )
+                    sd_mean.append(float(_vals.mean()))
+                    if _n > 1:
+                        _half = (
+                            t95(_n - 1)
+                            * float(_vals.std(ddof=1))
+                            / np.sqrt(_n)
+                        )
+                    else:
+                        _half = 0.0
+                    sd_ci.append(_half)
+                _acc = np.asarray(
+                    [m["final_acc"] for m in _ok], dtype=float
                 )
-                sd_mean.append(float(_vals.mean()))
+                _acc_mean = float(_acc.mean())
                 if _n > 1:
-                    _half = (
-                        t95(_n - 1)
-                        * float(_vals.std(ddof=1))
-                        / np.sqrt(_n)
+                    _acc_ci = float(
+                        t95(_n - 1) * _acc.std(ddof=1) / np.sqrt(_n)
                     )
                 else:
-                    _half = 0.0
-                sd_ci.append(_half)
-            _acc = np.asarray(
-                [m["final_acc"] for m in _ms], dtype=float
-            )
-            if _n > 1:
-                _acc_ci = float(
-                    t95(_n - 1) * _acc.std(ddof=1) / np.sqrt(_n)
-                )
+                    _acc_ci = 0.0
             else:
+                _acc_mean = 0.0
                 _acc_ci = 0.0
             results[f"{_aw:g}"] = {
                 "aw": float(_aw),
                 "n": _n,
+                "n_diverged": _n_diverged,
+                "diverged_epochs": [
+                    m["diverged_epoch"]
+                    for m in _ms
+                    if m["diverged"]
+                ],
                 "sd_mean": sd_mean,
                 "sd_ci": sd_ci,
-                "acc_mean": float(_acc.mean()) if _n else 0.0,
+                "acc_mean": _acc_mean,
                 "acc_ci": _acc_ci,
             }
 
@@ -717,12 +925,12 @@ def _(
                 "aws": eff_aws,
                 "seeds": eff_seeds,
                 "epochs": eff_epochs,
-                "batch_size": BATCH,
+                "batch_size": eff_batch,
                 "lr": LR,
                 "momentum": MOMENTUM,
                 "nesterov": False,
-                "grad_clip": GRAD_CLIP,
-                "detach_target": True,
+                "grad_clip": eff_clip,
+                "detach_target": eff_detach,
                 "smoke": smoke_test,
             },
             "device": {"type": device.type, "name": device_name},
@@ -742,13 +950,31 @@ def _(
 
 
 @app.cell
-def _(Path, fig4, json, mo):
+def _(Path, eff_out, fig4, json, math, mo):
+    def _finite(obj):
+        if isinstance(obj, float):
+            return obj if math.isfinite(obj) else None
+        if isinstance(obj, dict):
+            return {k: _finite(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [_finite(v) for v in obj]
+        return obj
+
     if fig4 is not None:
-        _payload = json.dumps(fig4).encode("utf-8")
+        _payload = json.dumps(_finite(fig4)).encode("utf-8")
         _loc = mo.notebook_location()
-        _msg = "notebook location unavailable"
-        if _loc is not None:
+        if eff_out:
+            _path = Path(eff_out)
+            if not _path.is_absolute() and _loc is not None:
+                _path = Path(str(_loc)) / _path
+        elif _loc is not None:
             _path = Path(str(_loc)) / "public" / "data" / "imdb_fig4.json"
+        else:
+            _path = None
+
+        if _path is None:
+            _msg = "notebook location unavailable (set SM_OUT to a path)"
+        else:
             try:
                 _path.parent.mkdir(parents=True, exist_ok=True)
                 _path.write_bytes(_payload)
@@ -865,13 +1091,20 @@ def _(mo):
     ### Implementation notes and deviations
 
     - **Batch size 512.** The paper's Table 1 lists 64; the repo's MNIST correction
-      establishes 512.
-    - **Detached target.** `a_hat` predicts `a.detach()`. The paper's methods say both
-      `a_hat` and `a` are functions of the weights (i.e. not detached), which is the
-      stronger regularizer; we follow the task/repo convention.
+      establishes 512. Override with `SM_BATCH=64` (or the UI).
+    - **Detached target.** By default `a_hat` predicts `a.detach()`. The paper's
+      methods say both `a_hat` and `a` are functions of the weights (i.e. not
+      detached), which is the stronger regularizer. `SM_DETACH=0` (or the UI) trains
+      against the live activations.
     - **Gradient clipping.** The detached self-modeling gradient at `lr=0.1` blows up
       for AW=500 within the first epoch, so the global gradient norm is clipped at 1.0.
-      Baseline gradient norms stay below 0.5, so the baseline is untouched.
+      Baseline gradient norms stay below 0.5, so the baseline is untouched. `SM_CLIP=0`
+      (or the UI) skips the `clip_grad_norm_` call entirely.
+    - **Divergence guard.** If a model's loss or any of its weights becomes
+      non-finite, that model stops updating (its gradient rows are masked before the
+      global clip, so it cannot corrupt the others), keeps training the rest, and is
+      recorded with the epoch it happened. Diverged seeds are excluded from the
+      means/CIs and reported per AW as `n_diverged`.
     - **Tokenizer / vocab.** `.split()` drops the empty-string token, giving 100,682
       unique train tokens plus `<unk>` = the paper's 100,683.
     - **Pruned weights.** `fig4_weights` holds the final embedding, hidden `W`/`b`, and
