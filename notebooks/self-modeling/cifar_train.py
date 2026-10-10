@@ -105,9 +105,11 @@ def _(mo):
       connections from the third block to the hidden layer". A standard
       ResNet-18 has no such skip, so this notebook uses only the stated target:
       `[pooled block-4 (512), hidden activations (2000)]` = 2512 values,
-      detached.
+      detached. `CIFAR_TARGET=hidden` drops the pooled part and
+      `CIFAR_DETACH=0` lets gradients flow through the target too.
     - Every run (including AW = 0) has the same output layer,
-      `Linear(2000, 10 + 2512)`, so seeds share identical classification rows.
+      `Linear(2000, 10 + target_dim)` (`target_dim` = 2512 for `concat`, 2000
+      for `hidden`), so seeds share identical classification rows.
       AW = 0 simply drops the self-modeling term; the extra rows are ignored.
     - Augmentation follows the usual RandomAffine recipe: rotation in
       `[-15, 15]` degrees, translation up to 10% of the image, horizontal flip.
@@ -144,15 +146,29 @@ def _(device, mo):
         value="reduce-overhead",
         label="Compile mode",
     )
+    detach_target = mo.ui.checkbox(
+        value=True, label="Detach self-model target (CIFAR_DETACH)"
+    )
+    target_mode = mo.ui.dropdown(
+        options=["concat", "hidden"],
+        value="concat",
+        label="Self-model target (CIFAR_TARGET)",
+    )
+    batch_size = mo.ui.number(
+        value=512, start=1, stop=4096, label="Batch size (CIFAR_BATCH)"
+    )
     return (
         aws,
+        batch_size,
         checkpoint_every,
         compile_flag,
         compile_mode,
         concurrent,
+        detach_target,
         epochs,
         seeds,
         smoke,
+        target_mode,
         train_button,
     )
 
@@ -160,24 +176,27 @@ def _(device, mo):
 @app.cell
 def _(
     aws,
+    batch_size,
     checkpoint_every,
     compile_flag,
     compile_mode,
     concurrent,
+    detach_target,
     epochs,
     mo,
     seeds,
     smoke,
+    target_mode,
     train_button,
 ):
     mo.md(
         """
     ### Configuration
 
-    Adam `lr=1e-3`, no schedule, no weight decay, batch 512. Each run trains
-    one ResNet-18 for the chosen number of epochs. `len(AW) * seeds` runs are
-    interleaved in groups of *Concurrent runs*; finished runs are skipped on
-    restart.
+    Adam `lr=1e-3`, no schedule, no weight decay, batch 512 by default
+    (`CIFAR_BATCH`). Each run trains one ResNet-18 for the chosen number of
+    epochs. `len(AW) * seeds` runs are interleaved in groups of *Concurrent
+    runs*; finished runs are skipped on restart.
 
     `torch.compile` defaults on for CUDA and off elsewhere; `reduce-overhead`
     captures CUDA graphs (fastest for this fixed-shape loop) and `max-autotune`
@@ -189,6 +208,11 @@ def _(
             mo.hstack([aws, seeds], justify="start", gap=2),
             mo.hstack([epochs, concurrent, checkpoint_every], justify="start", gap=2),
             mo.hstack([compile_flag, compile_mode], justify="start", gap=2),
+            mo.hstack(
+                [detach_target, target_mode, batch_size],
+                justify="start",
+                gap=2,
+            ),
             mo.hstack([smoke, train_button], justify="start", gap=2),
         ]
     )
@@ -198,15 +222,18 @@ def _(
 @app.cell
 def _(
     aws,
+    batch_size,
     checkpoint_every,
     compile_flag,
     compile_mode,
     concurrent,
+    detach_target,
     epochs,
     mo,
     os,
     seeds,
     smoke,
+    target_mode,
     train_button,
 ):
     _mode = mo.app_meta().mode
@@ -221,6 +248,9 @@ def _(
     eff_ckpt_every = 1 if smoke_test else int(checkpoint_every.value)
     eff_compile = bool(compile_flag.value)
     eff_compile_mode = str(compile_mode.value)
+    eff_detach = bool(detach_target.value)
+    eff_target = str(target_mode.value)
+    eff_batch = max(1, int(batch_size.value))
 
     if _script:
         _env_aws = os.environ.get("CIFAR_AWS", "")
@@ -252,16 +282,35 @@ def _(
         _compile_mode_env = os.environ.get("CIFAR_COMPILE_MODE")
         if _compile_mode_env:
             eff_compile_mode = _compile_mode_env.strip()
+        _detach_env = os.environ.get("CIFAR_DETACH")
+        if _detach_env is not None:
+            eff_detach = _detach_env.strip().lower() not in (
+                "0", "false", "off", "no"
+            )
+        _target_env = os.environ.get("CIFAR_TARGET")
+        if _target_env:
+            eff_target = _target_env.strip()
+        _batch_env = os.environ.get("CIFAR_BATCH")
+        if _batch_env:
+            eff_batch = max(1, int(_batch_env))
+
+    if eff_target not in ("concat", "hidden"):
+        raise ValueError(
+            f"CIFAR_TARGET must be 'concat' or 'hidden', got {eff_target!r}"
+        )
 
     train_clicked = bool(train_button.value) or _script
     return (
         eff_aws,
+        eff_batch,
         eff_ckpt_every,
         eff_compile,
         eff_compile_mode,
         eff_concurrent,
+        eff_detach,
         eff_epochs,
         eff_seeds,
+        eff_target,
         smoke_test,
         train_clicked,
     )
@@ -296,6 +345,8 @@ def _(
     N_CLASSES = 10
     POOLED_WIDTH = 512
     SELF_MODEL_SIZE = POOLED_WIDTH + HIDDEN_WIDTH
+    TARGET_DIMS = {"concat": SELF_MODEL_SIZE, "hidden": HIDDEN_WIDTH}
+    PROBE_N = 2048
     ROTATION_DEG = 15.0
     TRANSLATION = 0.10
     CHANNELS_LAST = "cuda"
@@ -352,9 +403,15 @@ def _(
     class CifarResNet18SelfModel(nn.Module):
         """CIFAR ResNet-18 -> hidden 2000 -> logits + self-model rows."""
 
-        def __init__(self, self_model_rows=SELF_MODEL_SIZE):
+        def __init__(self, target="concat"):
             super().__init__()
-            self.self_model_rows = self_model_rows
+            if target not in TARGET_DIMS:
+                raise ValueError(
+                    f"unknown self-model target {target!r}; "
+                    f"expected one of {sorted(TARGET_DIMS)}"
+                )
+            self.target = target
+            self.self_model_rows = TARGET_DIMS[target]
             self.stem = nn.Sequential(
                 nn.Conv2d(3, 64, 3, stride=1, padding=1, bias=False),
                 nn.BatchNorm2d(64),
@@ -365,7 +422,7 @@ def _(
             self.layer3 = self._make_layer(128, 256, 2, 2)
             self.layer4 = self._make_layer(256, 512, 2, 2)
             self.hidden = nn.Linear(POOLED_WIDTH, HIDDEN_WIDTH)
-            self.out = nn.Linear(HIDDEN_WIDTH, N_CLASSES + self_model_rows)
+            self.out = nn.Linear(HIDDEN_WIDTH, N_CLASSES + self.self_model_rows)
 
         @staticmethod
         def _make_layer(in_ch, out_ch, blocks, stride):
@@ -373,7 +430,8 @@ def _(
             layers.extend(BasicBlock(out_ch, out_ch, 1) for _ in range(blocks - 1))
             return nn.Sequential(*layers)
 
-        def forward(self, x):
+        def extract(self, x):
+            """Return (pooled block-4 features, hidden activations)."""
             x = self.stem(x)
             x = self.layer1(x)
             x = self.layer2(x)
@@ -381,15 +439,22 @@ def _(
             x = self.layer4(x)
             pooled = torch.flatten(F.adaptive_avg_pool2d(x, 1), 1)
             hidden = F.relu(self.hidden(pooled))
+            return pooled, hidden
+
+        def forward(self, x):
+            pooled, hidden = self.extract(x)
             out = self.out(hidden)
             logits = out[:, :N_CLASSES]
             a_hat = out[:, N_CLASSES:]
-            a = torch.cat([pooled, hidden], dim=1)
+            if self.target == "hidden":
+                a = hidden
+            else:
+                a = torch.cat([pooled, hidden], dim=1)
             return logits, a_hat, a
 
-    def build_model(seed, device):
+    def build_model(seed, device, target="concat"):
         torch.manual_seed(seed)
-        model = CifarResNet18SelfModel().to(device)
+        model = CifarResNet18SelfModel(target=target).to(device)
         if device.type == CHANNELS_LAST:
             model = model.to(memory_format=torch.channels_last)
         return model
@@ -397,6 +462,10 @@ def _(
     def classifier_sd(model):
         weights = model.out.weight[:N_CLASSES].detach().float()
         return float(weights.std())
+
+    def classifier_wnorm(model):
+        weights = model.out.weight[:N_CLASSES].detach().float()
+        return float(torch.linalg.vector_norm(weights))
 
     def prune_state_dict(model):
         """Whole-network weights with the self-model rows removed."""
@@ -479,6 +548,24 @@ def _(
     def normalize(x, mean, std):
         return (x - mean) / std
 
+    @torch.no_grad()
+    def activation_stats(model, X, mean, std, batch_size=BATCH_SIZE):
+        """Mean |activation| of hidden and pooled features on a probe batch."""
+        model.eval()
+        hidden_abs = 0.0
+        pooled_abs = 0.0
+        n = X.shape[0]
+        for lo in range(0, n, batch_size):
+            hi = min(lo + batch_size, n)
+            xb = normalize(X[lo:hi].float().div(255.0), mean, std)
+            if xb.device.type == CHANNELS_LAST:
+                xb = xb.contiguous(memory_format=torch.channels_last)
+            pooled, hidden = model.extract(xb)
+            hidden_abs += float(hidden.abs().sum())
+            pooled_abs += float(pooled.abs().sum())
+        model.train()
+        return hidden_abs / (n * HIDDEN_WIDTH), pooled_abs / (n * POOLED_WIDTH)
+
     def autocast_context(device):
         if device.type == CHANNELS_LAST:
             return torch.autocast(device_type="cuda", dtype=torch.bfloat16)
@@ -496,18 +583,19 @@ def _(
             for key, value in state_dict.items()
         }
 
-    def build_train_step(model, aw, compile_enabled, compile_mode):
+    def build_train_step(model, aw, compile_enabled, compile_mode, detach=True):
         """Forward + classification + self-model loss for one batch.
 
         `dynamic=False` keeps each batch shape on its own static graph; the
-        last partial batch (336 images) therefore costs one extra graph but
-        stays in training instead of being dropped.
+        last partial batch (336 images for batch 512) therefore costs one extra
+        graph but stays in training instead of being dropped.
         """
 
         def step(xb, yb):
             logits, a_hat, a = model(xb)
             ce = F.cross_entropy(logits, yb)
-            sm = (a_hat - a.detach()).pow(2).mean()
+            target = a.detach() if detach else a
+            sm = (a_hat - target).pow(2).mean()
             return ce + aw * sm
 
         if not compile_enabled:
@@ -535,15 +623,18 @@ def _(
         os.replace(tmp, path)
 
     def save_checkpoint(
-        path, aw, seed, epoch, target, model, optimizer, generator,
-        history, finished,
+        path, aw, seed, epoch, target_epochs, model, optimizer, generator,
+        history, finished, detach, target, batch_size,
     ):
         _atomic_save(
             {
                 "aw": aw,
                 "seed": seed,
                 "epoch": epoch,
-                "target_epochs": target,
+                "target_epochs": target_epochs,
+                "detach": detach,
+                "target": target,
+                "batch_size": batch_size,
                 "model": model.state_dict(),
                 "optimizer": optimizer.state_dict(),
                 "generator": generator.get_state(),
@@ -564,6 +655,9 @@ def _(
         ckpt_dir = Path(cfg["ckpt_dir"])
         compile_enabled = bool(cfg.get("compile", False))
         compile_mode = str(cfg.get("compile_mode", "reduce-overhead"))
+        detach = bool(cfg.get("detach", True))
+        target = str(cfg.get("target", "concat"))
+        batch_size = max(1, int(cfg.get("batch_size", BATCH_SIZE)))
         use_cudagraphs = (
             compile_enabled
             and compile_mode == "reduce-overhead"
@@ -576,7 +670,9 @@ def _(
             SMOKE_TEST_N if smoke else None,
         )
         n_train = X_train.shape[0]
-        n_steps = (n_train + BATCH_SIZE - 1) // BATCH_SIZE
+        n_steps = (n_train + batch_size - 1) // batch_size
+        probe_n = min(PROBE_N, X_test.shape[0])
+        X_probe = X_test[:probe_n]
 
         states = []
         for aw in aws:
@@ -589,7 +685,25 @@ def _(
                     checkpoint = torch.load(
                         path, map_location="cpu", weights_only=False
                     )
+                if checkpoint is not None:
+                    _stored = (
+                        bool(checkpoint.get("detach", True)),
+                        str(checkpoint.get("target", "concat")),
+                        int(checkpoint.get("batch_size", BATCH_SIZE)),
+                    )
+                    if _stored != (detach, target, batch_size):
+                        raise ValueError(
+                            f"Checkpoint {path} was trained with "
+                            f"detach={_stored[0]}, target={_stored[1]!r}, "
+                            f"batch={_stored[2]}; requested detach={detach}, "
+                            f"target={target!r}, batch={batch_size}. "
+                            "Refusing to resume; point CIFAR_CKPT_DIR at a "
+                            "separate directory for probe runs."
+                        )
                 if checkpoint is not None and checkpoint["epoch"] >= epochs:
+                    _history = checkpoint["history"]
+                    for _field in ("hidden_absmean", "pooled_absmean", "cls_wnorm"):
+                        _history.setdefault(_field, [])
                     states.append(
                         {
                             "key": key,
@@ -599,7 +713,7 @@ def _(
                             "train_step": None,
                             "optimizer": None,
                             "generator": None,
-                            "history": checkpoint["history"],
+                            "history": _history,
                             "epoch": int(checkpoint["epoch"]),
                             "path": path,
                             "resumed": True,
@@ -609,12 +723,12 @@ def _(
                     )
                     continue
 
-                model = build_model(seed, device)
+                model = build_model(seed, device, target)
                 optimizer = torch.optim.Adam(
                     model.parameters(), lr=LR, fused=device.type == "cuda"
                 )
                 train_step = build_train_step(
-                    model, aw, compile_enabled, compile_mode
+                    model, aw, compile_enabled, compile_mode, detach
                 )
                 generator = torch.Generator()
                 resumed = checkpoint is not None
@@ -628,8 +742,16 @@ def _(
                     start_epoch = int(checkpoint["epoch"])
                 else:
                     generator.manual_seed(seed)
-                    history = {"sd": [classifier_sd(model)], "test_acc": []}
+                    history = {
+                        "sd": [classifier_sd(model)],
+                        "test_acc": [],
+                        "hidden_absmean": [],
+                        "pooled_absmean": [],
+                        "cls_wnorm": [],
+                    }
                     start_epoch = 0
+                for _field in ("hidden_absmean", "pooled_absmean", "cls_wnorm"):
+                    history.setdefault(_field, [])
                 states.append(
                     {
                         "key": key,
@@ -674,8 +796,8 @@ def _(
                             torch.mps.synchronize()
                         start = time.perf_counter()
                         for step in range(n_steps):
-                            lo = step * BATCH_SIZE
-                            hi = min(lo + BATCH_SIZE, n_train)
+                            lo = step * batch_size
+                            hi = min(lo + batch_size, n_train)
                             for s in step_states:
                                 index = permutations[s["key"]][lo:hi]
                                 xb = augment_batch(
@@ -700,10 +822,23 @@ def _(
                         per_model_seconds = elapsed / len(step_states)
                         for s in step_states:
                             accuracy = test_accuracy(
-                                s["model"], X_test, y_test, mean, std
+                                s["model"], X_test, y_test, mean, std,
+                                batch_size=batch_size,
+                            )
+                            _hidden_absmean, _pooled_absmean = activation_stats(
+                                s["model"], X_probe, mean, std, batch_size
                             )
                             s["history"]["sd"].append(classifier_sd(s["model"]))
                             s["history"]["test_acc"].append(accuracy)
+                            s["history"]["hidden_absmean"].append(
+                                _hidden_absmean
+                            )
+                            s["history"]["pooled_absmean"].append(
+                                _pooled_absmean
+                            )
+                            s["history"]["cls_wnorm"].append(
+                                classifier_wnorm(s["model"])
+                            )
                             s["epoch"] = epoch
                             s["epoch_seconds"].append(per_model_seconds)
                             finished = epoch >= epochs
@@ -711,12 +846,16 @@ def _(
                                 print(
                                     f"{s['key']} epoch {epoch}/{epochs} | "
                                     f"{per_model_seconds:.2f} s/epoch | "
-                                    f"acc={accuracy:.4f}"
+                                    f"acc={accuracy:.4f} | "
+                                    f"hidden_absmean={_hidden_absmean:.4f} | "
+                                    f"pooled_absmean={_pooled_absmean:.4f} | "
+                                    f"cls_wnorm={s['history']['cls_wnorm'][-1]:.4f}"
                                 )
                                 save_checkpoint(
                                     s["path"], s["aw"], s["seed"], epoch,
                                     epochs, s["model"], s["optimizer"],
                                     s["generator"], s["history"], finished,
+                                    detach, target, batch_size,
                                 )
                                 if finished:
                                     _atomic_save(
@@ -734,6 +873,19 @@ def _(
 
         results = {}
         runs = {}
+
+        def _epoch_means(aw_states, field):
+            means = []
+            for index in range(epochs):
+                values = [
+                    s["history"][field][index]
+                    for s in aw_states
+                    if index < len(s["history"][field])
+                ]
+                m, _ = mean_ci(values)
+                means.append(m)
+            return means
+
         for aw in aws:
             aw = float(aw)
             aw_states = [s for s in states if abs(s["aw"] - aw) < 1e-12]
@@ -758,6 +910,13 @@ def _(
                 "n": len(aw_states),
                 "sd_mean": sd_mean,
                 "sd_ci": sd_ci,
+                "hidden_absmean_mean": _epoch_means(
+                    aw_states, "hidden_absmean"
+                ),
+                "pooled_absmean_mean": _epoch_means(
+                    aw_states, "pooled_absmean"
+                ),
+                "cls_wnorm_mean": _epoch_means(aw_states, "cls_wnorm"),
                 "acc_mean": acc_mean,
                 "acc_ci": acc_ci,
             }
@@ -773,6 +932,21 @@ def _(
                     "seed": s["seed"],
                     "final_acc": _final_acc,
                     "final_sd": s["history"]["sd"][-1],
+                    "final_hidden_absmean": (
+                        s["history"]["hidden_absmean"][-1]
+                        if s["history"]["hidden_absmean"]
+                        else None
+                    ),
+                    "final_pooled_absmean": (
+                        s["history"]["pooled_absmean"][-1]
+                        if s["history"]["pooled_absmean"]
+                        else None
+                    ),
+                    "final_cls_wnorm": (
+                        s["history"]["cls_wnorm"][-1]
+                        if s["history"]["cls_wnorm"]
+                        else None
+                    ),
                     "mean_epoch_seconds": (
                         sum(seconds) / len(seconds) if seconds else None
                     ),
@@ -785,7 +959,7 @@ def _(
                 "aws": [float(a) for a in aws],
                 "seeds": seeds_n,
                 "epochs": epochs,
-                "batch_size": BATCH_SIZE,
+                "batch_size": batch_size,
                 "lr": LR,
                 "optimizer": "adam",
                 "weight_decay": 0.0,
@@ -795,7 +969,10 @@ def _(
                 "checkpoint_interval": ckpt_every,
                 "checkpoint_dir": str(ckpt_dir),
                 "hidden_width": HIDDEN_WIDTH,
-                "self_model_size": SELF_MODEL_SIZE,
+                "detach": detach,
+                "target": target,
+                "target_dim": TARGET_DIMS[target],
+                "self_model_size": TARGET_DIMS[target],
                 "augmentation": {
                     "rotation_deg": ROTATION_DEG,
                     "translation": TRANSLATION,
@@ -819,12 +996,15 @@ def _(
     device,
     device_name,
     eff_aws,
+    eff_batch,
     eff_ckpt_every,
     eff_compile,
     eff_compile_mode,
     eff_concurrent,
+    eff_detach,
     eff_epochs,
     eff_seeds,
+    eff_target,
     mo,
     run_experiment,
     smoke_test,
@@ -838,9 +1018,12 @@ def _(
                 "aws": eff_aws,
                 "seeds": eff_seeds,
                 "epochs": eff_epochs,
+                "batch_size": eff_batch,
                 "concurrent": eff_concurrent,
                 "ckpt_every": eff_ckpt_every,
                 "smoke": smoke_test,
+                "detach": eff_detach,
+                "target": eff_target,
                 "compile": eff_compile,
                 "compile_mode": eff_compile_mode,
                 "device": device,
@@ -858,9 +1041,17 @@ def _(
         for _key, _record in fig3["runs"].items():
             _secs = _record["mean_epoch_seconds"]
             _secs = "n/a" if _secs is None else f"{_secs:.2f}s/epoch"
+            _hidden = _record["final_hidden_absmean"]
+            _pooled = _record["final_pooled_absmean"]
+            _wnorm = _record["final_cls_wnorm"]
+            _hidden = "n/a" if _hidden is None else f"{_hidden:.4f}"
+            _pooled = "n/a" if _pooled is None else f"{_pooled:.4f}"
+            _wnorm = "n/a" if _wnorm is None else f"{_wnorm:.4f}"
             print(
                 f"{_key}: final acc={_record['final_acc']:.4f} "
-                f"sd={_record['final_sd']:.5f} {_secs} "
+                f"sd={_record['final_sd']:.5f} "
+                f"hidden_absmean={_hidden} pooled_absmean={_pooled} "
+                f"cls_wnorm={_wnorm} {_secs} "
                 f"resumed={_record['resumed']}"
             )
         _out = mo.md(
