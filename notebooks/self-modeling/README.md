@@ -11,10 +11,11 @@ Reproduction of [Unexpected Benefits of Self-Modeling in Neural Systems](https:/
 
 - `self_modeling_essay.py` — visual essay; reads `public/data/`; saved outputs in `__marimo__/session/`.
 - `self_modeling_train.py` — GPU notebook for molab; marked `# smoke: skip`; writes `public/data/mnist_fig2.json`. Its hidden-512 run reproduces the original batched trainer's epoch-50 means to 5 decimals.
-- `imdb_train.py` — GPU notebook for molab; marked `# smoke: skip`; IMDB Fig 4A/4C trainer (EmbeddingBag -> linear hidden -> 2 + 128 output rows), writes `public/data/imdb_fig4.json`.
+- `imdb_train.py` — GPU notebook for molab; marked `# smoke: skip`; IMDB Fig 4A/4C trainer (EmbeddingBag -> linear hidden -> 2 + 128 output rows), writes `public/data/imdb_fig4.json`. `SM_SAVE_EPOCHS=250,500` (plus optional `SM_SAVE_DIR`, default `checkpoints/imdb`) writes the pruned classifier at those epochs for the RLCT notebook.
+- `imdb_rlct.py` — GPU notebook for molab (Figure 4B RLCT, IMDB); marked `# smoke: skip`; reads `checkpoints/imdb/epoch250/aw<aw>_seed<seed>.pt` and writes `public/data/imdb_fig4b.json`.
 - `cifar_train.py` — GPU notebook for molab (Figure 3, CIFAR-10); marked `# smoke: skip`; writes `public/data/cifar_fig3.json` and checkpoints runs under `checkpoints/` so a restarted session resumes.
 - `cifar_rlct.py` — GPU notebook for molab (Figure 3B RLCT, CIFAR-10); marked `# smoke: skip`; reads the pruned weights in `checkpoints/pruned/run_aw<aw>_seed<seed>.pt` and writes `public/data/cifar_fig3b.json`.
-- `public/data/` — `mnist_fig2a_local.json` (CPU sweep summary for preprocessing variants `a` and `b`), `mnist_fig2.json` (training-notebook output from the molab GPU: all four hidden sizes, 10 seeds, weight histograms), `mnist_fig2c.json` (RLCT), `imdb_fig4.json` (+ `imdb_fig4_variants.json`), `cifar_fig3.json` and `cifar_fig3b.json`.
+- `public/data/` — `mnist_fig2a_local.json` (CPU sweep summary for preprocessing variants `a` and `b`), `mnist_fig2.json` (training-notebook output from the molab GPU: all four hidden sizes, 10 seeds, weight histograms), `mnist_fig2c.json` (RLCT), `imdb_fig4.json` (+ `imdb_fig4_variants.json`), `imdb_fig4b.json`, `cifar_fig3.json` and `cifar_fig3b.json`.
 
 ## Corrections
 
@@ -33,4 +34,4 @@ The original script implementation (data, model, loss, sweep, batched trainer, t
 - Done: IMDB Fig 4 on the molab GPU (`public/data/imdb_fig4.json`, variants in `imdb_fig4_variants.json`). Accuracy reproduces with batch 64 (84.9%); the self-modeling effect on weight SD does not (AW 0/100/500 within ~1%, and SD ~10x below the paper's).
 - Done: CIFAR-10 Fig 3 on the molab GPU (40 runs x 250 epochs, `public/data/cifar_fig3.json`; RLCT in `cifar_fig3b.json`). Accuracy reproduces (92.1-92.3%). The weight-SD ordering is inverted (baseline narrowest), and RLCT shows no self-modeling effect (~24-25 at every AW vs the paper's 82 -> 66). Probes (no detach, hidden-only target, batch 64, BatchNorm-train sampling) don't recover the paper's direction; see the essay.
 - Done: essay covers every panel, with a scoreboard of what reproduced.
-- Next: IMDB Fig 4B (RLCT); test the identity-map hypothesis for IMDB; the `.detach()` exercise.
+- Next: test the identity-map hypothesis for IMDB; the `.detach()` exercise.
