@@ -32,4 +32,5 @@ The original script implementation (data, model, loss, sweep, batched trainer, t
 - Done: Fig 2C (RLCT) at localization 100 matches the paper within a few percent; localization 1000 (the supplement's text value) is ~7x lower with the same ordering. Estimated with a batched SGLD sampler validated against devinterp 2.0.1; results in `public/data/mnist_fig2c.json`.
 - Done: IMDB Fig 4 on the molab GPU (`public/data/imdb_fig4.json`, variants in `imdb_fig4_variants.json`). Accuracy reproduces with batch 64 (84.9%); the self-modeling effect on weight SD does not (AW 0/100/500 within ~1%, and SD ~10x below the paper's).
 - Done: CIFAR-10 Fig 3 on the molab GPU (40 runs x 250 epochs, `public/data/cifar_fig3.json`; RLCT in `cifar_fig3b.json`). Accuracy reproduces (92.1-92.3%). The weight-SD ordering is inverted (baseline narrowest), and RLCT shows no self-modeling effect (~24-25 at every AW vs the paper's 82 -> 66). Probes (no detach, hidden-only target, batch 64, BatchNorm-train sampling) don't recover the paper's direction; see the essay.
-- Next: essay sections for Figures 3 and 4; IMDB Fig 4B (RLCT).
+- Done: essay covers every panel, with a scoreboard of what reproduced.
+- Next: IMDB Fig 4B (RLCT); test the identity-map hypothesis for IMDB; the `.detach()` exercise.
