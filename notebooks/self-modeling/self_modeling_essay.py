@@ -41,8 +41,11 @@ def _(mo):
     is that it becomes simpler. Adding a self-prediction term to the
     loss narrows the spread of the final classifier's weights and
     lowers a formal complexity measure, while test accuracy barely
-    moves. This notebook walks through the idea and our reproduction
-    of the paper's Figure 2a on MNIST.
+    moves. This notebook walks through the idea, our reproduction
+    of Figure 2 on MNIST, and our attempts at the paper's CIFAR-10
+    (Figure 3) and IMDB (Figure 4) panels. The MNIST panels
+    reproduce. The others only partly do, and the places where they
+    diverge turn out to be the interesting part.
     """)
     return
 
@@ -1343,11 +1346,796 @@ def _(FIG2C, RLCT_RAW, RLCT_SIZES, mo):
 
 @app.cell
 def _(mo):
-    mo.md("""
-    /// admonition | Coming soon: CIFAR-10 and IMDB
-    The same auxiliary objective on a ResNet-18 for CIFAR-10 and an
-    embedding bag for IMDB. Placeholder until those runs are in.
-    ///
+    mo.md(r"""
+    ## Beyond MNIST: CIFAR-10 (Figure 3)
+
+    The paper repeats the experiment on CIFAR-10 with a ResNet-18.
+    The architecture differs from the MNIST MLP: here the classifier
+    reads from a hidden layer of 2000 units, and self-prediction adds
+    output rows that reconstruct that hidden layer. The panels ask
+    the same three questions as before: does weight spread shrink
+    (3A), does RLCT fall (3B), and does accuracy hold (3C)?
+    """)
+    return
+
+
+@app.cell
+def _(json, mo, pd):
+    _base = mo.notebook_location() / "public" / "data"
+
+    CIFAR_AWS = [0.0, 0.5, 1.0, 2.0]
+    CIFAR_COLORS = {
+        0.0: "#000000",
+        0.5: "#00e000",
+        1.0: "#0000ff",
+        2.0: "#a52a2a",
+    }
+    CIFAR_PAPER_3B = {0.0: 82, 0.5: 72, 1.0: 69, 2.0: 66}
+    CIFAR_PAPER_3C = [0.918, 0.920]
+
+    _fig3 = json.loads((_base / "cifar_fig3.json").read_text())
+    _fig3b = json.loads(
+        (_base / "cifar_fig3b.json").read_text()
+    )
+    _probes = json.loads(
+        (_base / "cifar_fig3_probes.json").read_text()
+    )
+
+    CIFAR_CONFIG = _fig3["config"]
+    CIFAR_DEVICE = _fig3["device"]["name"]
+
+    _sd_rows = []
+    _acc_rows = []
+    for _aw in CIFAR_AWS:
+        _entry = _fig3["results"][f"{_aw:g}"]
+        for _epoch, (_mean, _half) in enumerate(
+            zip(_entry["sd_mean"], _entry["sd_ci"])
+        ):
+            _sd_rows.append(
+                {
+                    "aw": _aw,
+                    "curve": f"AW={_aw:g}",
+                    "epoch": _epoch,
+                    "mean": float(_mean),
+                    "half": float(_half),
+                }
+            )
+        _acc_rows.append(
+            {
+                "aw": _aw,
+                "curve": f"AW={_aw:g}",
+                "acc": float(_entry["acc_mean"]),
+                "half": float(_entry["acc_ci"]),
+            }
+        )
+    CIFAR_FIG3A = pd.DataFrame(_sd_rows)
+    CIFAR_FIG3A["lo"] = CIFAR_FIG3A["mean"] - CIFAR_FIG3A["half"]
+    CIFAR_FIG3A["hi"] = CIFAR_FIG3A["mean"] + CIFAR_FIG3A["half"]
+    CIFAR_FIG3C = pd.DataFrame(_acc_rows)
+    CIFAR_FIG3C["lo"] = CIFAR_FIG3C["acc"] - CIFAR_FIG3C["half"]
+    CIFAR_FIG3C["hi"] = CIFAR_FIG3C["acc"] + CIFAR_FIG3C["half"]
+
+    _rlct_rows = []
+    for _aw in CIFAR_AWS:
+        _entry = _fig3b["rlct"][f"{_aw:g}"]
+        _rlct_rows.append(
+            {
+                "aw": _aw,
+                "curve": f"AW={_aw:g}",
+                "mean": float(_entry["mean"]),
+                "ci": float(_entry["ci"]),
+                "n": len(_entry["llc"]),
+            }
+        )
+    CIFAR_FIG3B = pd.DataFrame(_rlct_rows)
+    CIFAR_FIG3B["lo"] = CIFAR_FIG3B["mean"] - CIFAR_FIG3B["ci"]
+    CIFAR_FIG3B["hi"] = CIFAR_FIG3B["mean"] + CIFAR_FIG3B["ci"]
+
+    _probe_rows = []
+    for _variant, _aws in _probes["variants"].items():
+        for _aw, _probe in _aws.items():
+            _probe_rows.append(
+                {
+                    "variant": _variant,
+                    "aw": float(_aw),
+                    "sd_e50": float(_probe["sd_e50"]),
+                    "hidden": tuple(_probe["hidden_absmean"]),
+                    "cls_wnorm": tuple(_probe["cls_wnorm"]),
+                    "acc_e50": float(_probe["acc_e50"]),
+                }
+            )
+    CIFAR_PROBES = pd.DataFrame(_probe_rows)
+
+    return (
+        CIFAR_AWS,
+        CIFAR_COLORS,
+        CIFAR_CONFIG,
+        CIFAR_DEVICE,
+        CIFAR_FIG3A,
+        CIFAR_FIG3B,
+        CIFAR_FIG3C,
+        CIFAR_PAPER_3B,
+        CIFAR_PAPER_3C,
+        CIFAR_PROBES,
+    )
+
+
+@app.cell
+def _(
+    CIFAR_AWS,
+    CIFAR_COLORS,
+    CIFAR_CONFIG,
+    CIFAR_DEVICE,
+    CIFAR_FIG3A,
+    alt,
+    mo,
+):
+    _domain = [f"AW={_a:g}" for _a in CIFAR_AWS]
+    _scale = alt.Scale(
+        domain=_domain,
+        range=[CIFAR_COLORS[_a] for _a in CIFAR_AWS],
+    )
+    _band = (
+        alt.Chart(CIFAR_FIG3A)
+        .mark_area(opacity=0.15)
+        .encode(
+            x=alt.X("epoch:Q", title="Epoch"),
+            y=alt.Y(
+                "lo:Q",
+                title="SD of classifier weights",
+                scale=alt.Scale(zero=False),
+            ),
+            y2="hi:Q",
+            color=alt.Color(
+                "curve:N",
+                scale=_scale,
+                legend=alt.Legend(title="AW"),
+            ),
+        )
+    )
+    _line = (
+        alt.Chart(CIFAR_FIG3A)
+        .mark_line(strokeWidth=2)
+        .encode(
+            x=alt.X("epoch:Q"),
+            y=alt.Y("mean:Q", scale=alt.Scale(zero=False)),
+            color=alt.Color("curve:N", scale=_scale, legend=None),
+            tooltip=[
+                alt.Tooltip("curve:N"),
+                alt.Tooltip("epoch:Q"),
+                alt.Tooltip("mean:Q", format=".4f"),
+            ],
+        )
+    )
+    _chart = (_band + _line).properties(width=600, height=330)
+
+    _e250 = {
+        _aw: float(
+            CIFAR_FIG3A[
+                (CIFAR_FIG3A["aw"] == _aw)
+                & (CIFAR_FIG3A["epoch"] == 250)
+            ]["mean"].iloc[0]
+        )
+        for _aw in CIFAR_AWS
+    }
+    _narrow = min(CIFAR_AWS, key=lambda _a: _e250[_a])
+    _wide = max(CIFAR_AWS, key=lambda _a: _e250[_a])
+    _seeds = int(CIFAR_CONFIG["seeds"])
+    _epochs = int(CIFAR_CONFIG["epochs"])
+
+    _prose = mo.md(f"""
+    {len(CIFAR_AWS) * _seeds} models ({len(CIFAR_AWS)} AWs x
+    {_seeds} seeds, {_epochs} epochs) trained on {CIFAR_DEVICE}.
+    Bands are the mean +/- 95% CI half-width over seeds.
+
+    At epoch 250 our baseline (AW = 0) has SD **{_e250[0.0]:.4f}**,
+    inside the paper's 0.05-0.06 read-off. The ordering, though, is
+    inverted. In the paper the baseline is the widest curve and
+    larger AW narrows it. Here AW = 0 is the narrowest
+    ({_e250[_narrow]:.4f}) and AW = 2 is the widest
+    ({_e250[_wide]:.4f}). Self-modeling widened the classifier
+    instead of narrowing it.
+    """)
+    mo.vstack([mo.ui.altair_chart(_chart), _prose])
+    return
+
+
+@app.cell
+def _(
+    CIFAR_AWS,
+    CIFAR_COLORS,
+    CIFAR_FIG3B,
+    CIFAR_PAPER_3B,
+    alt,
+    mo,
+    np,
+    pd,
+):
+    _domain = [f"AW={_a:g}" for _a in CIFAR_AWS]
+    _scale = alt.Scale(
+        domain=_domain,
+        range=[CIFAR_COLORS[_a] for _a in CIFAR_AWS],
+    )
+    _y = alt.Scale(domain=[0, 90])
+    _bars = (
+        alt.Chart(CIFAR_FIG3B)
+        .mark_bar(size=42)
+        .encode(
+            x=alt.X("curve:N", title=None, sort=_domain),
+            y=alt.Y("mean:Q", title="RLCT (LLC estimate)", scale=_y),
+            color=alt.Color("curve:N", scale=_scale, legend=None),
+            tooltip=[
+                alt.Tooltip("curve:N"),
+                alt.Tooltip("mean:Q", format=".2f"),
+                alt.Tooltip("ci:Q", title="+/- CI", format=".2f"),
+            ],
+        )
+    )
+    _err = (
+        alt.Chart(CIFAR_FIG3B)
+        .mark_rule(strokeWidth=1.5, color="#333")
+        .encode(
+            x=alt.X("curve:N", sort=_domain),
+            y=alt.Y("lo:Q", scale=_y),
+            y2="hi:Q",
+        )
+    )
+    _paper_df = pd.DataFrame(
+        {
+            "curve": [f"AW={_a:g}" for _a in CIFAR_AWS],
+            "paper": [CIFAR_PAPER_3B[_a] for _a in CIFAR_AWS],
+        }
+    )
+    _paper = (
+        alt.Chart(_paper_df)
+        .mark_point(
+            shape="diamond",
+            filled=False,
+            size=110,
+            strokeWidth=2,
+        )
+        .encode(
+            x=alt.X("curve:N", sort=_domain),
+            y=alt.Y("paper:Q", scale=_y),
+            color=alt.Color("curve:N", scale=_scale, legend=None),
+            tooltip=[
+                alt.Tooltip("curve:N"),
+                alt.Tooltip("paper:Q", title="paper", format=".0f"),
+            ],
+        )
+    )
+    _chart = (_bars + _err + _paper).properties(
+        width=560,
+        height=330,
+    )
+
+    _means = {
+        _aw: float(
+            CIFAR_FIG3B[CIFAR_FIG3B["aw"] == _aw]["mean"].iloc[0]
+        )
+        for _aw in CIFAR_AWS
+    }
+    _spread = max(_means.values()) - min(_means.values())
+    _ratio = float(
+        np.mean(
+            [CIFAR_PAPER_3B[_aw] / _means[_aw] for _aw in CIFAR_AWS]
+        )
+    )
+    _n = int(CIFAR_FIG3B["n"].iloc[0])
+    _prose = mo.md(f"""
+    Bars are our mean LLC estimate, whiskers are the 95% CI over
+    {_n} seeds, and hollow diamonds are the paper's read-offs. Our
+    estimates are flat: {_means[0.0]:.1f} at AW = 0,
+    {_means[0.5]:.1f} at AW = 0.5, {_means[1.0]:.1f} at AW = 1,
+    {_means[2.0]:.1f} at AW = 2. The spread between the largest and
+    smallest is {_spread:.2f}, comparable to the individual CIs,
+    so the curves overlap and there is no visible self-modeling
+    effect.
+
+    The paper reads a monotone fall from 82 to 66, about 20%. Our
+    whole scale also sits roughly **{_ratio:.1f}x** below the
+    paper's. The same estimator matched the paper on MNIST, so the
+    gap more likely comes from the model or training setup than from
+    the estimator itself.
+    """)
+    mo.vstack([mo.ui.altair_chart(_chart), _prose])
+    return
+
+
+@app.cell
+def _(
+    CIFAR_AWS,
+    CIFAR_COLORS,
+    CIFAR_FIG3C,
+    CIFAR_PAPER_3C,
+    alt,
+    mo,
+    pd,
+):
+    _domain = [f"AW={_a:g}" for _a in CIFAR_AWS]
+    _scale = alt.Scale(
+        domain=_domain,
+        range=[CIFAR_COLORS[_a] for _a in CIFAR_AWS],
+    )
+    _y = alt.Scale(domain=[0.90, 0.94])
+    _bars = (
+        alt.Chart(CIFAR_FIG3C)
+        .mark_bar(size=42)
+        .encode(
+            x=alt.X("curve:N", title=None, sort=_domain),
+            y=alt.Y("acc:Q", title="Test accuracy", scale=_y),
+            color=alt.Color("curve:N", scale=_scale, legend=None),
+            tooltip=[
+                alt.Tooltip("curve:N"),
+                alt.Tooltip("acc:Q", format=".4f"),
+                alt.Tooltip("half:Q", title="+/- CI", format=".4f"),
+            ],
+        )
+    )
+    _err = (
+        alt.Chart(CIFAR_FIG3C)
+        .mark_rule(strokeWidth=1.5, color="#333")
+        .encode(
+            x=alt.X("curve:N", sort=_domain),
+            y=alt.Y("lo:Q", scale=_y),
+            y2="hi:Q",
+        )
+    )
+    _paper_df = pd.DataFrame(
+        {
+            "paper": [sum(CIFAR_PAPER_3C) / len(CIFAR_PAPER_3C)],
+            "label": ["paper (0.918-0.920)"],
+        }
+    )
+    _paper = (
+        alt.Chart(_paper_df)
+        .mark_rule(strokeDash=[5, 4], strokeWidth=1.6, color="#888")
+        .encode(y=alt.Y("paper:Q", scale=_y))
+    )
+    _paper_label = (
+        alt.Chart(_paper_df)
+        .mark_text(align="left", dx=4, dy=-5, color="#888")
+        .encode(
+            y=alt.Y("paper:Q", scale=_y),
+            text="label:N",
+        )
+    )
+    _chart = (_bars + _err + _paper + _paper_label).properties(
+        width=560,
+        height=300,
+    )
+
+    _lo = float(CIFAR_FIG3C["acc"].min())
+    _hi = float(CIFAR_FIG3C["acc"].max())
+    _prose = mo.md(f"""
+    Accuracy is essentially unchanged by self-modeling: {_lo:.1%} to
+    {_hi:.1%} across AW, against the paper's 0.918-0.920. The
+    dashed line is the middle of the paper's range. On this panel
+    the reproduction lands, which is what makes the 3A and 3B
+    mismatches worth a second look.
+    """)
+    mo.vstack([mo.ui.altair_chart(_chart), _prose])
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""
+    ## Why does CIFAR go the other way?
+
+    Figure 3A and Figure 3B disagree with the paper, but the probes
+    in `cifar_fig3_probes.json` tell a consistent story: the network
+    is not getting simpler, it is re-parameterizing. The table
+    compares four variants at AW = 0 and AW = 2 (means over two
+    seeds, 50 epochs). `hidden |a|` is the mean absolute hidden
+    activation on test images; `classifier |W|` is the L2 norm of
+    the classifier rows. Both are reported first -> last logged
+    epoch.
+    """)
+    return
+
+
+@app.cell
+def _(CIFAR_PROBES, mo):
+    _order = ["base", "nodetach", "hidden", "b64"]
+    _labels = {
+        "base": "base (detached target)",
+        "nodetach": "no detach",
+        "hidden": "hidden-only target",
+        "b64": "batch 64",
+    }
+    _lines = [
+        (
+            "| variant | AW | SD @ 50 | hidden \\|a\\| first -> last "
+            "| classifier \\|W\\| first -> last |"
+        ),
+        "| --- | ---: | ---: | ---: | ---: |",
+    ]
+    for _variant in _order:
+        for _aw in (0.0, 2.0):
+            _row = CIFAR_PROBES[
+                (CIFAR_PROBES["variant"] == _variant)
+                & (CIFAR_PROBES["aw"] == _aw)
+            ].iloc[0]
+            _hfirst, _hlast = _row["hidden"]
+            _wfirst, _wlast = _row["cls_wnorm"]
+            _lines.append(
+                f"| {_labels[_variant]} | {_aw:g} "
+                f"| {_row['sd_e50']:.4f} "
+                f"| {_hfirst:.3f} -> {_hlast:.3f} "
+                f"| {_wfirst:.2f} -> {_wlast:.2f} |"
+            )
+    mo.md("\n".join(_lines))
+    return
+
+
+@app.cell
+def _(CIFAR_PROBES, mo):
+    def _probe(_variant, _aw):
+        _row = CIFAR_PROBES[
+            (CIFAR_PROBES["variant"] == _variant)
+            & (CIFAR_PROBES["aw"] == _aw)
+        ].iloc[0]
+        return _row
+
+    _b0 = _probe("base", 0.0)
+    _b2 = _probe("base", 2.0)
+    _n0 = _probe("nodetach", 0.0)
+    _n2 = _probe("nodetach", 2.0)
+    _h0 = _probe("hidden", 0.0)
+    _h2 = _probe("hidden", 2.0)
+    _b640 = _probe("b64", 0.0)
+    _b642 = _probe("b64", 2.0)
+
+    mo.md(f"""
+    **What is happening.** Under self-modeling the network has a
+    reason to make its hidden activations predictable, and the
+    easiest way is to make them small. In the base run the hidden
+    magnitude at AW = 2 starts at {_b2['hidden'][0]:.3f} versus
+    {_b0['hidden'][0]:.3f} at AW = 0. Smaller activations force
+    larger classifier weights to keep the logits at the same scale,
+    so the weight norm grows further at AW = 2
+    ({_b2['cls_wnorm'][1]:.2f}) than at AW = 0
+    ({_b0['cls_wnorm'][1]:.2f}). Weight spread is not
+    scale-invariant: shrink the input and the weights must grow.
+    That is exactly why the paper also reports RLCT, which is
+    invariant to this rescaling. Our RLCT (3B) is flat, so the
+    widening in 3A is a units artifact, not extra complexity.
+
+    **What the probes ruled out.**
+
+    - *Detach.* Removing the stop-gradient (no detach) leaves the
+      inversion in place: SD {_n0['sd_e50']:.4f} at AW = 0 and
+      {_n2['sd_e50']:.4f} at AW = 2, versus {_b0['sd_e50']:.4f}
+      and {_b2['sd_e50']:.4f} for base. Gradient flow through the
+      target copy is not the cause.
+    - *Batch size.* Batch 64 changes the level a lot
+      ({_b640['sd_e50']:.4f} at AW = 0, {_b642['sd_e50']:.4f} at
+      AW = 2) but keeps the same ordering, so the inversion is not
+      a batch-size artifact.
+    - *Hidden-only target.* Making the target the hidden layer
+      alone nearly flattens the curves:
+      {_h0['sd_e50']:.4f} at AW = 0 and {_h2['sd_e50']:.4f} at
+      AW = 2. This is the probe that comes closest to removing the
+      inversion.
+
+    **What we could not test.** The paper describes skip
+    connections from block 3 into the hidden layer. We could not
+    map that onto a standard ResNet-18, so our hidden layer sits
+    after global pooling. That architectural difference is a real
+    candidate for the gap, but we have not isolated it.
+    """)
+    return
+
+
+@app.cell
+def _(mo):
+    cifar_scale_s = mo.ui.slider(
+        start=0.25,
+        stop=2.0,
+        step=0.05,
+        value=1.0,
+        label="Activation scale s (toy)",
+    )
+    cifar_scale_s
+    return (cifar_scale_s,)
+
+
+@app.cell
+def _(cifar_scale_s, mo, np):
+    _rng = np.random.default_rng(0)
+    _a = _rng.normal(size=512)
+    _logits = np.random.default_rng(1).normal(size=10)
+    _denom = float(_a @ _a)
+    _w = np.outer(_logits, _a) / _denom
+    _base_sd = float(_w.std())
+    _s = float(cifar_scale_s.value)
+    _grid = [0.25, 0.5, 1.0, 1.5, 2.0]
+    _rows = "\n".join(
+        f"| {_g:.2f} | {1.0 / _g:.2f} | {_base_sd / _g:.4f} |"
+        for _g in _grid
+    )
+    mo.md(f"""
+    A fixed logit target fixes the product of classifier weights and
+    activations. If the activations shrink by a factor $s$, the
+    weights must grow by $1/s$ to keep the logits the same. Weight
+    SD is proportional to weight scale, so it scales as $1/s$ too.
+
+    With a random toy target ($W a =$ fixed logits, base weight SD
+    {_base_sd:.4f}), at $s = {_s:.2f}$ the needed weight scale is
+    **{1.0 / _s:.2f}** and the weight SD is
+    **{_base_sd / _s:.4f}**.
+
+    | activation scale s | weight scale 1/s | weight SD |
+    | ---: | ---: | ---: |
+    {_rows}
+    """)
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""
+    ## IMDB (Figure 4)
+
+    The third experiment is sentiment classification on IMDB with an
+    embedding bag and a hidden layer. Figure 4A plots classifier
+    weight SD, 4B is RLCT, and 4C is accuracy. We ran the training
+    panels, not 4B. Pick a variant; the main run is batch 64 with
+    gradient clipping, the one that matches the paper's batch size.
+    """)
+    return
+
+
+@app.cell
+def _(json, mo, pd):
+    _path = (
+        mo.notebook_location()
+        / "public"
+        / "data"
+        / "imdb_fig4_variants.json"
+    )
+    _raw = json.loads(_path.read_text())
+
+    IMDB_AWS = [0.0, 100.0, 500.0]
+    IMDB_COLORS = {
+        0.0: "#000000",
+        100.0: "#00e000",
+        500.0: "#0000ff",
+    }
+    IMDB_PAPER_4A = {0.0: 2.05, 100.0: 1.65, 500.0: 0.75}
+    IMDB_OPTIONS = {
+        "batch 64, grad clip (main)": "b64_clip",
+        "batch 512, grad clip": "b512_clip",
+        "batch 64, no grad clip": "b64_noclip",
+        "batch 512, no detach": "b512_nodetach",
+    }
+
+    _rows = []
+    _summary = []
+    for _key, _variant in _raw["variants"].items():
+        for _aw in IMDB_AWS:
+            _entry = _variant["results"][f"{_aw:g}"]
+            for _epoch, (_mean, _half) in enumerate(
+                zip(_entry["sd_mean"], _entry["sd_ci"])
+            ):
+                _rows.append(
+                    {
+                        "variant": _key,
+                        "aw": _aw,
+                        "curve": f"AW={_aw:g}",
+                        "epoch": _epoch,
+                        "mean": float(_mean),
+                        "half": float(_half),
+                    }
+                )
+            _summary.append(
+                {
+                    "variant": _key,
+                    "aw": _aw,
+                    "final_sd": float(_entry["sd_mean"][-1]),
+                    "acc": float(_entry["acc_mean"]),
+                    "n": int(_entry["n"]),
+                    "n_diverged": int(_entry["n_diverged"]),
+                }
+            )
+    IMDB_FIG4A = pd.DataFrame(_rows)
+    IMDB_FIG4A["lo"] = IMDB_FIG4A["mean"] - IMDB_FIG4A["half"]
+    IMDB_FIG4A["hi"] = IMDB_FIG4A["mean"] + IMDB_FIG4A["half"]
+    IMDB_SUMMARY = pd.DataFrame(_summary)
+    return (
+        IMDB_AWS,
+        IMDB_COLORS,
+        IMDB_FIG4A,
+        IMDB_OPTIONS,
+        IMDB_PAPER_4A,
+        IMDB_SUMMARY,
+    )
+
+
+@app.cell
+def _(IMDB_OPTIONS, mo):
+    imdb_variant = mo.ui.dropdown(
+        options=IMDB_OPTIONS,
+        value=next(iter(IMDB_OPTIONS)),
+        label="IMDB run variant",
+    )
+    imdb_variant
+    return (imdb_variant,)
+
+
+@app.cell
+def _(
+    IMDB_AWS,
+    IMDB_COLORS,
+    IMDB_FIG4A,
+    IMDB_PAPER_4A,
+    alt,
+    imdb_variant,
+    mo,
+    pd,
+):
+    _df = IMDB_FIG4A[
+        IMDB_FIG4A["variant"] == imdb_variant.value
+    ].copy()
+    _domain = [f"AW={_a:g}" for _a in IMDB_AWS]
+    _scale = alt.Scale(
+        domain=_domain,
+        range=[IMDB_COLORS[_a] for _a in IMDB_AWS],
+    )
+    _paper_df = pd.DataFrame(
+        {
+            "curve": [f"AW={_a:g}" for _a in IMDB_AWS],
+            "epoch": [500] * len(IMDB_AWS),
+            "paper": [IMDB_PAPER_4A[_a] for _a in IMDB_AWS],
+        }
+    )
+    _y_hi = max(
+        float(_df["hi"].max()),
+        max(IMDB_PAPER_4A.values()),
+    ) * 1.1
+    _y = alt.Scale(domain=[0.0, _y_hi], zero=True)
+
+    _band = (
+        alt.Chart(_df)
+        .mark_area(opacity=0.15)
+        .encode(
+            x=alt.X("epoch:Q", title="Epoch"),
+            y=alt.Y(
+                "lo:Q",
+                title="SD of classifier weights",
+                scale=_y,
+            ),
+            y2="hi:Q",
+            color=alt.Color(
+                "curve:N",
+                scale=_scale,
+                legend=alt.Legend(title="AW"),
+            ),
+        )
+    )
+    _line = (
+        alt.Chart(_df)
+        .mark_line(strokeWidth=2)
+        .encode(
+            x=alt.X("epoch:Q"),
+            y=alt.Y("mean:Q", scale=_y),
+            color=alt.Color("curve:N", scale=_scale, legend=None),
+            tooltip=[
+                alt.Tooltip("curve:N"),
+                alt.Tooltip("epoch:Q"),
+                alt.Tooltip("mean:Q", format=".4f"),
+            ],
+        )
+    )
+    _points = (
+        alt.Chart(_paper_df)
+        .mark_point(
+            shape="diamond",
+            filled=False,
+            size=110,
+            strokeWidth=2,
+        )
+        .encode(
+            x=alt.X("epoch:Q"),
+            y=alt.Y("paper:Q", scale=_y),
+            color=alt.Color(
+                "curve:N",
+                scale=_scale,
+                legend=None,
+            ),
+            tooltip=[
+                alt.Tooltip("curve:N"),
+                alt.Tooltip("paper:Q", title="paper", format=".2f"),
+            ],
+        )
+    )
+    _chart = (_band + _line + _points).properties(
+        width=600,
+        height=340,
+        title=f"IMDB SD vs epoch, {imdb_variant.value}",
+    )
+    mo.ui.altair_chart(_chart)
+    return
+
+
+@app.cell
+def _(IMDB_SUMMARY, mo):
+    _lines = [
+        "| variant | AW | final SD | accuracy | diverged |",
+        "| --- | ---: | ---: | ---: | ---: |",
+    ]
+    for _row in IMDB_SUMMARY.to_dict("records"):
+        _lines.append(
+            f"| {_row['variant']} | {_row['aw']:g} "
+            f"| {_row['final_sd']:.4f} | {_row['acc']:.4f} "
+            f"| {_row['n_diverged']}/{_row['n']} |"
+        )
+    mo.md("\n".join(_lines))
+    return
+
+
+@app.cell
+def _(IMDB_PAPER_4A, IMDB_SUMMARY, mo):
+    _base = IMDB_SUMMARY[
+        (IMDB_SUMMARY["variant"] == "b64_clip")
+        & (IMDB_SUMMARY["aw"] == 0.0)
+    ].iloc[0]
+    _gap = IMDB_PAPER_4A[0.0] / float(_base["final_sd"])
+    _healthy = IMDB_SUMMARY[IMDB_SUMMARY["n_diverged"] == 0]
+    _spreads = [
+        float(
+            _healthy[_healthy["variant"] == _v]["final_sd"].max()
+            - _healthy[_healthy["variant"] == _v]["final_sd"].min()
+        )
+        for _v in _healthy["variant"].unique()
+    ]
+    _worst = max(_spreads)
+    _div = int(IMDB_SUMMARY["n_diverged"].sum())
+    _intended = int(IMDB_SUMMARY["n"].max()) * len(IMDB_SUMMARY)
+    mo.md(f"""
+    The main run reproduces the paper's accuracy: **{_base['acc']:.1%}**
+    at batch 64, a little above the paper's 0.819-0.836. But no
+    variant separates the AWs. Across the healthy cells the final SD
+    spans at most **{_worst:.3f}**, and every curve overlaps every
+    other one. {_div} of {_intended} runs diverged, all of them the
+    no-clip batch-64 variant at AW = 500.
+
+    The weight SD also sits about **{_gap:.0f}x** below the paper's
+    epoch-500 read-offs: baseline {IMDB_PAPER_4A[0.0]:.2f} in the
+    paper versus {_base['final_sd']:.3f} here. Whatever the paper's
+    self-modeling term does to IMDB, our runs show almost none of
+    it.
+
+    **Hypothesis, untested.** Our output layer predicts the hidden
+    activations from those same activations. If the self-model rows
+    can learn to copy their input, they can drive the self-model
+    loss to zero with an identity map, and then the self-model term
+    stops pushing on the rest of the network. With SGD at learning
+    rate 0.1 and AW up to 500, that shortcut is found quickly. This
+    would explain both failures at once: no AW separation and no
+    movement in the classifier weights. We have not tested it.
+    """)
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""
+    ## Scoreboard
+
+    | paper panel | reproduced? | note |
+    | --- | --- | --- |
+    | 2A | yes | MNIST SD ordering matches within ~0.001 at epoch 50 (variant a). |
+    | 2B | yes | Hidden-size sweep and small-net collapse match. |
+    | 2C | yes | RLCT ordering matches at localization 100, within a few percent. |
+    | 2D | yes | Accuracy collapse of small nets at large AW reproduced. |
+    | 3A | no | SD ordering inverted: baseline is the narrowest curve. |
+    | 3B | no | RLCT flat across AW and about 3x below the paper's scale. |
+    | 3C | yes | Accuracy 0.921-0.923, flat across AW, matching 0.918-0.920. |
+    | 4A | no | No AW separation; SD about 10x below the paper. |
+    | 4B | not run | IMDB RLCT was not estimated. |
+    | 4C | partly | Accuracy 84.9% near the paper's range but flat across AW. |
     """)
     return
 

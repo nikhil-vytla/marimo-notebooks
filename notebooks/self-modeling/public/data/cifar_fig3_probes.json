@@ -1,0 +1,157 @@
+{
+ "note": "Summary of CIFAR-10 diagnostic probes run on molab's GPU (RTX PRO 6000 Blackwell): 50 epochs, 2 seeds per cell, AW 0 vs AW 2, means over seeds. 'base' = setup as reproduced (detached target, target = [pooled block-4 512, hidden 2000], batch 512). Values transcribed from the probe checkpoints' histories at the time of the run; per-epoch curves were not exported.",
+ "metrics": {
+  "sd_e10": "classifier-row weight SD at epoch 10",
+  "sd_e50": "at epoch 50",
+  "hidden_absmean": "mean |hidden activation| on 2048 test images, first -> last logged epoch (of 50)",
+  "pooled_absmean": "mean |pooled block-4 feature|, first -> last logged epoch (of 50)",
+  "cls_wnorm": "L2 norm of classifier rows, first -> last logged epoch (of 50)",
+  "acc_e50": "test accuracy at epoch 50"
+ },
+ "variants": {
+  "base": {
+   "0": {
+    "sd_e10": 0.0161,
+    "sd_e50": 0.0252,
+    "hidden_absmean": [
+     0.1867,
+     0.2088
+    ],
+    "pooled_absmean": [
+     0.8012,
+     0.6525
+    ],
+    "cls_wnorm": [
+     1.8873,
+     3.5927
+    ],
+    "acc_e50": 0.9018
+   },
+   "2": {
+    "sd_e10": 0.0187,
+    "sd_e50": 0.0292,
+    "hidden_absmean": [
+     0.1189,
+     0.1914
+    ],
+    "pooled_absmean": [
+     0.6974,
+     0.6664
+    ],
+    "cls_wnorm": [
+     2.0737,
+     4.174
+    ],
+    "acc_e50": 0.9067
+   }
+  },
+  "nodetach": {
+   "0": {
+    "sd_e10": 0.0161,
+    "sd_e50": 0.0249,
+    "hidden_absmean": [
+     0.1974,
+     0.2101
+    ],
+    "pooled_absmean": [
+     0.7821,
+     0.6769
+    ],
+    "cls_wnorm": [
+     1.8886,
+     3.5538
+    ],
+    "acc_e50": 0.897
+   },
+   "2": {
+    "sd_e10": 0.0192,
+    "sd_e50": 0.0287,
+    "hidden_absmean": [
+     0.1146,
+     0.1576
+    ],
+    "pooled_absmean": [
+     0.688,
+     0.3932
+    ],
+    "cls_wnorm": [
+     2.1744,
+     4.106
+    ],
+    "acc_e50": 0.9019
+   }
+  },
+  "hidden": {
+   "0": {
+    "sd_e10": 0.0162,
+    "sd_e50": 0.0249,
+    "hidden_absmean": [
+     0.1764,
+     0.2151
+    ],
+    "pooled_absmean": [
+     0.6728,
+     0.6966
+    ],
+    "cls_wnorm": [
+     1.8937,
+     3.55
+    ],
+    "acc_e50": 0.9022
+   },
+   "2": {
+    "sd_e10": 0.0176,
+    "sd_e50": 0.0253,
+    "hidden_absmean": [
+     0.1183,
+     0.1803
+    ],
+    "pooled_absmean": [
+     0.7812,
+     0.731
+    ],
+    "cls_wnorm": [
+     2.0531,
+     3.6117
+    ],
+    "acc_e50": 0.9054
+   }
+  },
+  "b64": {
+   "0": {
+    "sd_e10": 0.0212,
+    "sd_e50": 0.0561,
+    "hidden_absmean": [
+     0.0783,
+     0.0375
+    ],
+    "pooled_absmean": [
+     0.6926,
+     0.2532
+    ],
+    "cls_wnorm": [
+     2.0434,
+     8.0658
+    ],
+    "acc_e50": 0.9125
+   },
+   "2": {
+    "sd_e10": 0.0235,
+    "sd_e50": 0.0765,
+    "hidden_absmean": [
+     0.0666,
+     0.0457
+    ],
+    "pooled_absmean": [
+     0.7141,
+     0.2166
+    ],
+    "cls_wnorm": [
+     2.2209,
+     11.064
+    ],
+    "acc_e50": 0.9075
+   }
+  }
+ }
+}
