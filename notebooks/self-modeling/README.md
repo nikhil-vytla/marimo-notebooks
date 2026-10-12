@@ -11,7 +11,8 @@ Reproduction of [Unexpected Benefits of Self-Modeling in Neural Systems](https:/
 
 - `self_modeling_essay.py` — visual essay; reads `public/data/`; saved outputs in `__marimo__/session/`.
 - `self_modeling_train.py` — GPU notebook for molab; marked `# smoke: skip`; writes `public/data/mnist_fig2.json`. Its hidden-512 run reproduces the original batched trainer's epoch-50 means to 5 decimals.
-- `public/data/` — `mnist_fig2a_local.json` (CPU sweep summary for preprocessing variants `a` and `b`) and `mnist_fig2.json` (training-notebook output from the molab GPU: all four hidden sizes, 10 seeds, weight histograms).
+- `imdb_train.py` — GPU notebook for molab; marked `# smoke: skip`; IMDB Fig 4A/4C trainer (EmbeddingBag -> linear hidden -> 2 + 128 output rows), writes `public/data/imdb_fig4.json`.
+- `public/data/` — `mnist_fig2a_local.json` (CPU sweep summary for preprocessing variants `a` and `b`) and `mnist_fig2.json` (training-notebook output from the molab GPU: all four hidden sizes, 10 seeds, weight histograms). `imdb_fig4.json` is written by `imdb_train.py`.
 
 ## Corrections
 
@@ -27,4 +28,5 @@ The original script implementation (data, model, loss, sweep, batched trainer, t
 
 - Done: Fig 2A reproduced within ~0.001; Fig 2B and 2D reproduced on the molab GPU (240 models, ~43 s of GPU time), including the accuracy collapse of small networks at large AW.
 - Done: Fig 2C (RLCT) at localization 100 matches the paper within a few percent; localization 1000 (the supplement's text value) is ~7x lower with the same ordering. Estimated with a batched SGLD sampler validated against devinterp 2.0.1; results in `public/data/mnist_fig2c.json`.
-- Next: IMDB (Fig 4), CIFAR-10 (Fig 3, ~4–6 h on molab GPU).
+- Done: IMDB Fig 4 on the molab GPU (`public/data/imdb_fig4.json`, variants in `imdb_fig4_variants.json`). Accuracy reproduces with batch 64 (84.9%); the self-modeling effect on weight SD does not (AW 0/100/500 within ~1%, and SD ~10x below the paper's).
+- Next: IMDB Fig 4B (RLCT), CIFAR-10 (Fig 3, branch `cifar-fig3`).
