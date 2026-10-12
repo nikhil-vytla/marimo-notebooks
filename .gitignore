@@ -6,4 +6,5 @@ __pycache__/
 .ruff_cache/
 .DS_Store
 notebooks/*/outputs/
+notebooks/self-modeling/checkpoints/
 .cache/
