@@ -1881,8 +1881,9 @@ def _(mo):
     The third experiment is sentiment classification on IMDB with an
     embedding bag and a hidden layer. Figure 4A plots classifier
     weight SD, 4B is RLCT, and 4C is accuracy. We ran the training
-    panels, not 4B. Pick a variant; the main run is batch 64 with
-    gradient clipping, the one that matches the paper's batch size.
+    panels and estimated 4B's RLCT. Pick a variant; the main run is
+    batch 64 with gradient clipping, the one that matches the paper's
+    batch size.
     """)
     return
 
@@ -2120,6 +2121,124 @@ def _(IMDB_PAPER_4A, IMDB_SUMMARY, mo):
 
 
 @app.cell
+def _(json, mo, pd):
+    _path = (
+        mo.notebook_location()
+        / "public"
+        / "data"
+        / "imdb_fig4b.json"
+    )
+    _raw = json.loads(_path.read_text())
+
+    IMDB_PAPER_4B = {0.0: 13.7, 100.0: 11.2, 500.0: 5.2}
+    _rows = []
+    for _entry in _raw["rlct"].values():
+        _aw = float(_entry["aw"])
+        _rows.append(
+            {
+                "aw": _aw,
+                "mean": float(_entry["mean"]),
+                "half": float(_entry["ci"]),
+                "paper": IMDB_PAPER_4B[_aw],
+            }
+        )
+    IMDB_FIG4B = pd.DataFrame(_rows).sort_values("aw")
+    IMDB_FIG4B["lo"] = IMDB_FIG4B["mean"] - IMDB_FIG4B["half"]
+    IMDB_FIG4B["hi"] = IMDB_FIG4B["mean"] + IMDB_FIG4B["half"]
+    IMDB_FIG4B["curve"] = IMDB_FIG4B["aw"].map(
+        lambda _a: f"AW={_a:g}"
+    )
+    return IMDB_FIG4B, IMDB_PAPER_4B
+
+
+@app.cell
+def _(IMDB_AWS, IMDB_COLORS, IMDB_FIG4B, alt, mo):
+    _domain = [f"AW={_a:g}" for _a in IMDB_AWS]
+    _scale = alt.Scale(
+        domain=_domain,
+        range=[IMDB_COLORS[_a] for _a in IMDB_AWS],
+    )
+    _y = alt.Scale(zero=True)
+    _bars = (
+        alt.Chart(IMDB_FIG4B)
+        .mark_bar(size=64, opacity=0.85)
+        .encode(
+            x=alt.X("curve:N", title="AW", sort=_domain),
+            y=alt.Y("mean:Q", title="RLCT (LLC)", scale=_y),
+            color=alt.Color("curve:N", scale=_scale, legend=None),
+            tooltip=[
+                alt.Tooltip("curve:N", title="AW"),
+                alt.Tooltip("mean:Q", title="ours", format=".3f"),
+                alt.Tooltip("half:Q", title="95% CI", format=".3f"),
+            ],
+        )
+    )
+    _ci = (
+        alt.Chart(IMDB_FIG4B)
+        .mark_rule(strokeWidth=2)
+        .encode(
+            x=alt.X("curve:N", sort=_domain),
+            y=alt.Y("lo:Q", scale=_y),
+            y2="hi:Q",
+            color=alt.Color("curve:N", scale=_scale, legend=None),
+        )
+    )
+    _paper = (
+        alt.Chart(IMDB_FIG4B)
+        .mark_point(
+            shape="diamond",
+            filled=False,
+            size=130,
+            strokeWidth=2,
+        )
+        .encode(
+            x=alt.X("curve:N", sort=_domain),
+            y=alt.Y("paper:Q", scale=_y),
+            color=alt.Color(
+                "curve:N",
+                scale=_scale,
+                legend=alt.Legend(title="AW"),
+            ),
+            tooltip=[
+                alt.Tooltip("curve:N", title="AW"),
+                alt.Tooltip("paper:Q", title="paper", format=".1f"),
+            ],
+        )
+    )
+    _chart = (_bars + _ci + _paper).properties(
+        width=460,
+        height=320,
+        title="IMDB RLCT by AW: ours (bars) vs paper (diamonds)",
+    )
+    mo.ui.altair_chart(_chart)
+    return
+
+
+@app.cell
+def _(IMDB_FIG4B, mo):
+    _means = {
+        float(_r["aw"]): float(_r["mean"])
+        for _r in IMDB_FIG4B.to_dict("records")
+    }
+    _spread = max(_means.values()) - min(_means.values())
+    _ratio = 13.7 / _means[0.0]
+    mo.md(f"""
+    ### Figure 4B: RLCT
+
+    The RLCT is flat across AW: **{_means[0.0]:.2f}**,
+    **{_means[100.0]:.2f}**, and **{_means[500.0]:.2f}** (spread
+    {_spread:.2f}), about **{_ratio:.0f}x** below the paper's
+    baseline of 13.7 and nowhere near its 13.7 -> 5.2 slope. This
+    matches the flat weight SD above and is consistent with the
+    identity-map hypothesis we have not yet tested. The estimator
+    follows the paper's supplement settings (devinterp 2.0.1,
+    lr 1e-3, localization 10, nbeta = batch/log(batch) at batch 64,
+    4 chains x 2000 draws), recorded in `imdb_fig4b.json`.
+    """)
+    return
+
+
+@app.cell
 def _(mo):
     mo.md(r"""
     ## Scoreboard
@@ -2134,7 +2253,7 @@ def _(mo):
     | 3B | no | RLCT flat across AW and about 3x below the paper's scale. |
     | 3C | yes | Accuracy 0.921-0.923, flat across AW, matching 0.918-0.920. |
     | 4A | no | No AW separation; SD about 10x below the paper. |
-    | 4B | not run | IMDB RLCT was not estimated. |
+    | 4B | no | RLCT flat across AW (~2.4 vs paper 13.7 -> 5.2). |
     | 4C | partly | Accuracy 84.9% near the paper's range but flat across AW. |
     """)
     return
