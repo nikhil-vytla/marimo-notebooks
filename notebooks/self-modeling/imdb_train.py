@@ -186,6 +186,13 @@ def _(
     overridden: `SM_BATCH`, `SM_CLIP` (`0` disables clipping), `SM_DETACH` (`0`
     trains against the live activations), `SM_AWS` (comma-separated, e.g. `0,500`),
     `SM_OUT` (JSON output path), `SM_SEEDS`, `SM_EPOCHS`.
+
+    Two more env variables control checkpointing and work in any mode:
+    `SM_SAVE_EPOCHS` (comma-separated epochs, e.g. `250,500`; empty = off) and
+    `SM_SAVE_DIR` (default: this notebook's `checkpoints/imdb`). At each listed
+    epoch the pruned classifier (embedding, hidden `W`/`b`, output rows `[:2]`)
+    is written to `{SM_SAVE_DIR}/epoch{E}/aw{aw:g}_seed{seed}.pt` alongside a
+    `config.json`. Saving does not alter the trained weights.
     """)
     mo.vstack(
         [
@@ -200,6 +207,7 @@ def _(
 
 @app.cell
 def _(
+    Path,
     aws,
     batch,
     clip,
@@ -246,6 +254,18 @@ def _(
         if os.environ.get("SM_EPOCHS"):
             eff_epochs = int(os.environ["SM_EPOCHS"])
 
+    # Checkpointing is env-driven and independent of the script-mode gate.
+    _save_raw = os.environ.get("SM_SAVE_EPOCHS", "").strip()
+    eff_save_epochs = tuple(
+        sorted({int(part) for part in _save_raw.split(",") if part.strip()})
+    )
+    _save_default = (
+        Path(str(mo.notebook_location() or ".")) / "checkpoints" / "imdb"
+    )
+    eff_save_dir = os.environ.get("SM_SAVE_DIR", "").strip() or str(
+        _save_default
+    )
+
     train_clicked = bool(train_button.value) or _script
     return (
         eff_aws,
@@ -254,6 +274,8 @@ def _(
         eff_detach,
         eff_epochs,
         eff_out,
+        eff_save_dir,
+        eff_save_epochs,
         eff_seeds,
         smoke_test,
         train_clicked,
@@ -536,12 +558,15 @@ def _(
     F,
     LR,
     MOMENTUM,
+    Path,
     build_params,
     classifier_sd,
     evaluate_batched,
     forward_batched,
+    json,
     math,
     mo,
+    os,
     pack_batch,
     prepare_imdb,
     time,
@@ -556,6 +581,8 @@ def _(
         batch_size,
         grad_clip,
         detach_target,
+        save_epochs,
+        save_dir,
     ):
         """Train every (aw, seed) in one AW group together; return raw per-model data."""
         data = prepare_imdb()
@@ -732,6 +759,82 @@ def _(
                 sd_hist[m].append(_sd if math.isfinite(_sd) else 0.0)
                 acc_hist[m].append(_acc if math.isfinite(_acc) else 0.0)
 
+            # Snapshot the pruned classifier (no self-model rows). This only
+            # reads params after the epoch's updates, so training is unchanged.
+            if save_epochs and epoch in save_epochs:
+                _epoch_dir = Path(save_dir) / f"epoch{epoch}"
+                _epoch_dir.mkdir(parents=True, exist_ok=True)
+                _records = []
+                for m, (_aw, _seed) in enumerate(models):
+                    _diverged = diverged_epoch[m] is not None
+                    _blob = {
+                        "aw": float(_aw),
+                        "seed": int(_seed),
+                        "epoch": int(epoch),
+                        "vocab_size": int(vocab_size),
+                        "d": int(params["Wh"].shape[2]),
+                        "h": int(params["Wh"].shape[1]),
+                        "emb": params["emb"][
+                            m * vocab_size : (m + 1) * vocab_size
+                        ]
+                        .detach()
+                        .cpu()
+                        .clone(),
+                        "Wh": params["Wh"][m].detach().cpu().clone(),
+                        "bh": params["bh"][m].detach().cpu().clone(),
+                        "Wo": params["Wo"][m, :2].detach().cpu().clone(),
+                        "bo": params["bo"][m, :2].detach().cpu().clone(),
+                        "diverged": _diverged,
+                    }
+                    _path = _epoch_dir / f"aw{_aw:g}_seed{_seed}.pt"
+                    _tmp = _path.with_name(_path.name + ".tmp")
+                    torch.save(_blob, _tmp)
+                    os.replace(_tmp, _path)
+                    _records.append(
+                        {
+                            "aw": float(_aw),
+                            "seed": int(_seed),
+                            "file": _path.name,
+                            "diverged": _diverged,
+                        }
+                    )
+                _cfg_path = _epoch_dir / "config.json"
+                _prior = {}
+                if _cfg_path.exists():
+                    try:
+                        _prior = json.loads(_cfg_path.read_text())
+                    except (OSError, ValueError):
+                        _prior = {}
+                _merged = {
+                    (float(_m["aw"]), int(_m["seed"])): _m
+                    for _m in _prior.get("models", [])
+                }
+                for _rec in _records:
+                    _merged[(_rec["aw"], _rec["seed"])] = _rec
+                _config = {
+                    "epoch": int(epoch),
+                    "aws": sorted(
+                        {float(a) for a in aws_list}
+                        | {float(a) for a in _prior.get("aws", [])}
+                    ),
+                    "seeds": int(seeds_n),
+                    "planned_epochs": int(epochs),
+                    "batch_size": int(batch_size),
+                    "lr": LR,
+                    "momentum": MOMENTUM,
+                    "grad_clip": float(grad_clip),
+                    "detach_target": bool(detach_target),
+                    "vocab_size": int(vocab_size),
+                    "d": int(params["Wh"].shape[2]),
+                    "h": int(params["Wh"].shape[1]),
+                    "models": [_merged[_key] for _key in sorted(_merged)],
+                }
+                _cfg_path.write_text(json.dumps(_config, indent=2))
+                print(
+                    f"saved {len(_records)} pruned models at epoch {epoch} "
+                    f"-> {_epoch_dir}"
+                )
+
         runs = [
             {
                 "aw": aw,
@@ -783,6 +886,8 @@ def _(
     eff_clip,
     eff_detach,
     eff_epochs,
+    eff_save_dir,
+    eff_save_epochs,
     eff_seeds,
     mo,
     train_clicked,
@@ -806,6 +911,8 @@ def _(
                         eff_batch,
                         eff_clip,
                         eff_detach,
+                        eff_save_epochs,
+                        eff_save_dir,
                     )
                 )
                 _bar.update(subtitle=f"AW={_group} done")
@@ -1110,6 +1217,10 @@ def _(mo):
     - **Pruned weights.** `fig4_weights` holds the final embedding, hidden `W`/`b`, and
       the two classifier rows per model for the later RLCT step. It is kept in memory
       only and is not part of `imdb_fig4.json`.
+    - **Checkpoints.** Set `SM_SAVE_EPOCHS=250,500` (and optionally `SM_SAVE_DIR`) to
+      write the pruned classifier from each listed epoch to
+      `{SM_SAVE_DIR}/epoch{E}/aw{aw:g}_seed{seed}.pt` plus a per-epoch `config.json`.
+      `imdb_rlct.py` reads these. The default `checkpoints/imdb/` is gitignored.
     """)
     return
 
