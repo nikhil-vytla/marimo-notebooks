@@ -633,8 +633,13 @@ def _(
         gens = [torch.Generator() for _ in range(M)]
 
         if freeze_selfhead:
+            # Self-model rows (C:) are frozen and restored after every step;
+            # classifier rows (:C) stay in the optimizer. The init copies are
+            # also what the AW=0 guard below compares against.
             _init_self_w = params["Wo"][:, C:, :].detach().clone()
             _init_self_b = params["bo"][:, C:].detach().clone()
+            _init_cls_w = params["Wo"][:, :C, :].detach().clone()
+            _init_cls_b = params["bo"][:, :C].detach().clone()
         sm_hist = [[] for _ in range(M)]
         id_hist = [[] for _ in range(M)]
         bs_hist = [[] for _ in range(M)]
@@ -658,8 +663,8 @@ def _(
         def sanitize_grads(alive_mask):
             # A dead model can still emit NaN/inf gradients (0 upstream times a
             # NaN local Jacobian). Replace non-finite grads with zero and drop
-            # the dead rows entirely before the global-norm clip, otherwise one
-            # bad model would poison every other model's gradient.
+            # the dead rows entirely before the per-model clip, otherwise a
+            # NaN would poison that model's own norm.
             _emb_g = params["emb"].grad
             if _emb_g is not None:
                 _emb_g.nan_to_num_(nan=0.0, posinf=0.0, neginf=0.0)
@@ -669,6 +674,41 @@ def _(
                 if _g is not None:
                     _g.nan_to_num_(nan=0.0, posinf=0.0, neginf=0.0)
                     _g[~alive_mask] = 0.0
+
+        def per_model_sq_norm():
+            # Squared L2 norm of each model's own gradients. `emb` stores every
+            # model's vocabulary table stacked along dim 0, so fold vocab_size
+            # into the model axis before reducing.
+            _sq = torch.zeros(M, device=device)
+            _emb_g = params["emb"].grad
+            if _emb_g is not None:
+                _sq = _sq + _emb_g.view(M, -1).pow(2).sum(dim=1)
+            for _key in ("Wh", "bh", "Wo", "bo"):
+                _g = params[_key].grad
+                if _g is not None:
+                    _sq = _sq + _g.view(M, -1).pow(2).sum(dim=1)
+            return _sq
+
+        def clip_grads_per_model():
+            # Clip each model with its own norm, matching clip_grad_norm_ run on
+            # that model alone. A single global norm over the whole stack would
+            # couple otherwise-independent models and over-clip each by ~sqrt(M).
+            _sq = per_model_sq_norm()
+            if not bool(torch.isfinite(_sq).all()):
+                # A finite loss can still hide an inf gradient; a non-finite
+                # squared norm would poison that model's scale. Wipe and retry.
+                sanitize_grads(alive)
+                _sq = per_model_sq_norm()
+            _scale = torch.clamp(
+                grad_clip / (_sq.sqrt() + 1e-6), max=1.0
+            )
+            _emb_g = params["emb"].grad
+            if _emb_g is not None:
+                _emb_g.view(M, -1).mul_(_scale.unsqueeze(1))
+            for _key in ("Wh", "bh", "Wo", "bo"):
+                _g = params[_key].grad
+                if _g is not None:
+                    _g.mul_(_scale.reshape([M] + [1] * (_g.dim() - 1)))
 
         def finite_weights():
             with torch.no_grad():
@@ -794,24 +834,23 @@ def _(
                 safe = torch.where(alive, loss, torch.zeros_like(loss))
                 safe.sum().backward()
                 if freeze_selfhead:
+                    # Zero only the self-model rows. The stacked output tensors
+                    # carry a leading model dimension, so slicing along dim 1
+                    # (and dim 1 for the bias) leaves every model's classifier
+                    # rows (:C) with their full gradient. The clip below then
+                    # sees the same classifier gradients as an unfrozen run.
                     with torch.no_grad():
                         params["Wo"].grad[:, C:, :] = 0.0
                         params["bo"].grad[:, C:] = 0.0
                 if bool((~finite).any()) or not bool(alive.all()):
                     sanitize_grads(alive)
                 if grad_clip > 0:
-                    _norm = torch.nn.utils.clip_grad_norm_(
-                        list(params.values()), grad_clip
-                    )
-                    if not bool(torch.isfinite(_norm)):
-                        # A finite loss can still hide an inf gradient; the first
-                        # clip then turns every grad into NaN. Wipe and re-clip.
-                        sanitize_grads(alive)
-                        torch.nn.utils.clip_grad_norm_(
-                            list(params.values()), grad_clip
-                        )
+                    clip_grads_per_model()
                 opt.step()
                 if freeze_selfhead:
+                    # Belt-and-braces: momentum and weight decay are both zero
+                    # here, but re-copying the saved rows makes the freeze hold
+                    # for any optimizer that would otherwise nudge them.
                     with torch.no_grad():
                         params["Wo"][:, C:, :].copy_(_init_self_w)
                         params["bo"][:, C:].copy_(_init_self_b)
@@ -942,6 +981,33 @@ def _(
                     f"saved {len(_records)} pruned models at epoch {epoch} "
                     f"-> {_epoch_dir}"
                 )
+
+        if freeze_selfhead:
+            # Guard the AW=0 contract: the self-model term has zero weight, so
+            # freezing rows C: must leave baseline training untouched. Every
+            # still-alive AW=0 model has to have moved its classifier rows.
+            _aw0_alive = [
+                _m
+                for _m, (_aw, _seed) in enumerate(models)
+                if _aw == 0.0 and bool(alive[_m])
+            ]
+            if _aw0_alive:
+                with torch.no_grad():
+                    _cls_w_delta = (
+                        params["Wo"][:, :C, :] - _init_cls_w
+                    ).abs().amax(dim=(1, 2))
+                    _cls_b_delta = (
+                        params["bo"][:, :C] - _init_cls_b
+                    ).abs().amax(dim=1)
+                for _m in _aw0_alive:
+                    assert float(_cls_w_delta[_m]) > 0.0, (
+                        "SM_FREEZE_SELFHEAD at AW=0 froze classifier "
+                        f"weights for model {models[_m]}"
+                    )
+                    assert float(_cls_b_delta[_m]) > 0.0, (
+                        "SM_FREEZE_SELFHEAD at AW=0 froze classifier "
+                        f"biases for model {models[_m]}"
+                    )
 
         runs = [
             {
@@ -1349,12 +1415,16 @@ def _(mo):
       detached), which is the stronger regularizer. `SM_DETACH=0` (or the UI) trains
       against the live activations.
     - **Gradient clipping.** The detached self-modeling gradient at `lr=0.1` blows up
-      for AW=500 within the first epoch, so the global gradient norm is clipped at 1.0.
-      Baseline gradient norms stay below 0.5, so the baseline is untouched. `SM_CLIP=0`
-      (or the UI) skips the `clip_grad_norm_` call entirely.
+      for AW=500 within the first epoch, so gradients are clipped at norm 1.0
+      **per model**: each model's own norm is taken over its own parameters and
+      rescaled independently, which is identical to running `clip_grad_norm_` on
+      that model alone. Baseline gradient norms stay below 0.5, so the baseline is
+      untouched. `SM_CLIP=0` (or the UI) skips clipping entirely. Results produced
+      before this fix used one global norm across all stacked models, which coupled
+      the models and over-clipped each by roughly `sqrt(M)`.
     - **Divergence guard.** If a model's loss or any of its weights becomes
       non-finite, that model stops updating (its gradient rows are masked before the
-      global clip, so it cannot corrupt the others), keeps training the rest, and is
+      per-model clip, so it cannot corrupt the others), keeps training the rest, and is
       recorded with the epoch it happened. Diverged seeds are excluded from the
       means/CIs and reported per AW as `n_diverged`.
     - **Tokenizer / vocab.** `.split()` drops the empty-string token, giving 100,682
