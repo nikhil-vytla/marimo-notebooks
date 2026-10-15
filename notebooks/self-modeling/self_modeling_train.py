@@ -137,11 +137,28 @@ def _(aws, epochs, hidden_sizes, mo, os, seeds, smoke, train_button):
     eff_aws = [float(a) for a in aws.value]
     eff_seeds = 2 if smoke_test else int(seeds.value)
     eff_epochs = 2 if smoke_test else int(epochs.value)
+    eff_log_identity = os.environ.get("SM_LOG_IDENTITY") == "1"
+    eff_out = os.environ.get("SM_OUT", "").strip()
+
+    if _script:
+        if os.environ.get("SM_AWS"):
+            eff_aws = [
+                float(a)
+                for a in os.environ["SM_AWS"].split(",")
+                if a.strip()
+            ]
+        if os.environ.get("SM_SEEDS"):
+            eff_seeds = int(os.environ["SM_SEEDS"])
+        if os.environ.get("SM_EPOCHS"):
+            eff_epochs = int(os.environ["SM_EPOCHS"])
+
     train_clicked = bool(train_button.value) or _script
     return (
         eff_aws,
         eff_epochs,
         eff_hidden,
+        eff_log_identity,
+        eff_out,
         eff_seeds,
         smoke_test,
         train_clicked,
@@ -296,12 +313,14 @@ def _(F, nn, np, torch):
 @app.cell
 def _(
     BATCH,
+    F,
     LR,
     MOMENTUM,
     build_params,
     classifier_hist,
     classifier_sd,
     evaluate_batched,
+    forward_batched,
     load_mnist,
     mo,
     time,
@@ -309,7 +328,7 @@ def _(
     train_step,
 ):
     @mo.persistent_cache
-    def train_hidden(hidden, aws_list, seeds_n, epochs, device_type):
+    def train_hidden(hidden, aws_list, seeds_n, epochs, device_type, log_identity):
         """Train every (aw, seed) for one hidden size; return raw per-model data."""
         device = torch.device(device_type)
         X, y, Xte, yte = load_mnist(device)
@@ -328,6 +347,10 @@ def _(
         N = X.shape[0]
         seeds = [seed for _, seed in models]
         gens = [torch.Generator() for _ in range(M)]
+        sm_hist = [[] for _ in range(M)]
+        id_hist = [[] for _ in range(M)]
+        bs_hist = [[] for _ in range(M)]
+        share_hist = [[] for _ in range(M)]
 
         snapshot_epochs = [e for e in (0, 1, 2, 5, 10, 20, 30, 40, 50) if e <= epochs]
         sd_hist = [[] for _ in range(M)]
@@ -361,11 +384,83 @@ def _(
             if device.type == "mps":
                 torch.mps.synchronize()
             start = time.perf_counter()
+            _sm_epoch_sum = torch.zeros(M, device=device)
+            _n_batches = 0
 
             for lo in range(0, N, BATCH):
                 hi = min(lo + BATCH, N)
                 idx = perms[:, lo:hi]
-                train_step(params, opt, X[idx], y[idx], aws)
+                if log_identity and lo == 0:
+                    # Same-batch autograd probes on the hidden layer (W1, b1);
+                    # separate from the training backward and discarded.
+                    _logits, _a_hat, _a = forward_batched(params, X[idx])
+                    _ce = (
+                        F.cross_entropy(
+                            _logits.reshape(-1, 10),
+                            y[idx].reshape(-1),
+                            reduction="none",
+                        )
+                        .reshape(M, -1)
+                        .mean(dim=1)
+                    )
+                    _sm = (_a_hat - _a.detach()).pow(2).mean(dim=(1, 2))
+                    _ce_grads = torch.autograd.grad(
+                        _ce.sum(),
+                        [params[0], params[1]],
+                        retain_graph=True,
+                        allow_unused=True,
+                    )
+                    _sm_grads = torch.autograd.grad(
+                        (aws * _sm).sum(),
+                        [params[0], params[1]],
+                        retain_graph=True,
+                        allow_unused=True,
+                    )
+                    for _m in range(M):
+                        _ce_parts = [
+                            _g[_m].reshape(-1)
+                            for _g in _ce_grads
+                            if _g is not None
+                        ]
+                        _sm_parts = [
+                            _g[_m].reshape(-1)
+                            for _g in _sm_grads
+                            if _g is not None
+                        ]
+                        _ce_norm = (
+                            torch.linalg.vector_norm(torch.cat(_ce_parts))
+                            if _ce_parts
+                            else torch.zeros((), device=device)
+                        )
+                        _sm_norm = (
+                            torch.linalg.vector_norm(torch.cat(_sm_parts))
+                            if _sm_parts
+                            else torch.zeros((), device=device)
+                        )
+                        _denom = float(_ce_norm + _sm_norm)
+                        _share = (
+                            float(_sm_norm) / _denom
+                            if _denom > 0
+                            else float("nan")
+                        )
+                        share_hist[_m].append(
+                            float("nan")
+                            if models[_m][0] == 0
+                            else _share
+                        )
+                    del (
+                        _logits,
+                        _a_hat,
+                        _a,
+                        _ce,
+                        _sm,
+                        _ce_grads,
+                        _sm_grads,
+                    )
+                _ce_v, _sm_v = train_step(params, opt, X[idx], y[idx], aws)
+                if log_identity:
+                    _sm_epoch_sum += _sm_v
+                    _n_batches += 1
 
             sd_vec = classifier_sd(params)
             acc_vec = evaluate_batched(params, Xte, yte, device)
@@ -373,6 +468,32 @@ def _(
             if device.type == "mps":
                 torch.mps.synchronize()
             epoch_seconds.append(time.perf_counter() - start)
+
+            if log_identity:
+                _sm_batch_mean = (
+                    (_sm_epoch_sum / _n_batches).tolist()
+                    if _n_batches
+                    else [float("nan")] * M
+                )
+                with torch.no_grad():
+                    _self_w = params[2][:, 10:, :]
+                    _self_h = _self_w.shape[1]
+                    _eye = torch.eye(_self_h, device=device)
+                    _id_vec = torch.linalg.matrix_norm(
+                        _self_w - _eye, ord="fro", dim=(1, 2)
+                    ) / float(_self_h) ** 0.5
+                    _bs_vec = torch.linalg.vector_norm(
+                        params[3][:, 10:], dim=1
+                    )
+                for _m in range(M):
+                    if models[_m][0] == 0:
+                        sm_hist[_m].append(float("nan"))
+                        id_hist[_m].append(float("nan"))
+                        bs_hist[_m].append(float("nan"))
+                    else:
+                        sm_hist[_m].append(_sm_batch_mean[_m])
+                        id_hist[_m].append(_id_vec[_m].item())
+                        bs_hist[_m].append(_bs_vec[_m].item())
 
             for m in range(M):
                 sd_hist[m].append(sd_vec[m].item())
@@ -396,6 +517,10 @@ def _(
                 "test_acc": acc_hist[m],
                 "final_acc": acc_hist[m][-1],
                 "hist": {str(e): hist_snap[e][m] for e in snapshot_epochs},
+                "sm_loss": sm_hist[m] if log_identity else None,
+                "id_dist": id_hist[m] if log_identity else None,
+                "b_s_norm": bs_hist[m] if log_identity else None,
+                "sm_grad_share": share_hist[m] if log_identity else None,
             }
             for m, (aw, seed) in enumerate(models)
         ]
@@ -408,6 +533,7 @@ def _(
             "models": runs,
             "final_params": final_params,
             "epoch_seconds": epoch_seconds,
+            "log_identity": bool(log_identity),
         }
 
     return (train_hidden,)
@@ -420,6 +546,7 @@ def _(
     eff_aws,
     eff_epochs,
     eff_hidden,
+    eff_log_identity,
     eff_seeds,
     mo,
     train_clicked,
@@ -432,7 +559,14 @@ def _(
         ) as bar:
             for _h in eff_hidden:
                 runs.append(
-                    train_hidden(_h, eff_aws, eff_seeds, eff_epochs, device.type)
+                    train_hidden(
+                        _h,
+                        eff_aws,
+                        eff_seeds,
+                        eff_epochs,
+                        device.type,
+                        eff_log_identity,
+                    )
                 )
                 bar.update(subtitle=f"hidden={_h} done")
 
@@ -487,6 +621,7 @@ def _(
             half = t95(n - 1) * float(arr.std(ddof=1)) / np.sqrt(n)
             return float(arr.mean()), float(half)
 
+        _log_identity = any(r.get("log_identity") for r in runs)
         _results = {}
         for _run in runs:
             _aw_map = {}
@@ -529,6 +664,27 @@ def _(
                     "acc_ci_per_epoch": _acc_ep_ci,
                     "hist_mean": _hist_mean,
                 }
+                if _log_identity:
+                    _identity = {}
+                    for _name in (
+                        "sm_loss",
+                        "id_dist",
+                        "b_s_norm",
+                        "sm_grad_share",
+                    ):
+                        _seed_lists = [r[_name] for r in _runs_aw]
+                        _mean = (
+                            np.asarray(_seed_lists, dtype=float)
+                            .mean(axis=0)
+                            .tolist()
+                            if _seed_lists
+                            else []
+                        )
+                        _identity[_name] = {
+                            "mean": _mean,
+                            "seeds": _seed_lists,
+                        }
+                    _aw_map[_key]["identity"] = _identity
             _results[str(_run["hidden"])] = {
                 "hidden": _run["hidden"],
                 "epochs": _run["epochs"],
@@ -548,6 +704,7 @@ def _(
                 "lr": 0.005,
                 "momentum": 0.9,
                 "nesterov": True,
+                "log_identity": bool(_log_identity),
                 "smoke": smoke_test,
             },
             "device": {"type": device.type, "name": device_name},
@@ -564,16 +721,24 @@ def _(
 
 
 @app.cell
-def _(fig2, mo):
+def _(eff_out, fig2, mo):
     import json
     from pathlib import Path
 
     if fig2 is not None:
         _payload = json.dumps(fig2).encode("utf-8")
         _loc = mo.notebook_location()
-        _msg = "notebook location unavailable"
-        if _loc is not None:
+        if eff_out:
+            _path = Path(eff_out)
+            if not _path.is_absolute() and _loc is not None:
+                _path = Path(str(_loc)) / _path
+        elif _loc is not None:
             _path = Path(str(_loc)) / "public" / "data" / "mnist_fig2.json"
+        else:
+            _path = None
+        if _path is None:
+            _msg = "notebook location unavailable (set SM_OUT to a path)"
+        else:
             try:
                 _path.parent.mkdir(parents=True, exist_ok=True)
                 _path.write_bytes(_payload)

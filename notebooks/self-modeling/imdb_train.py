@@ -266,6 +266,10 @@ def _(
         _save_default
     )
 
+    # Identity-map diagnostics, off by default and env-only (script mode).
+    eff_log_identity = os.environ.get("SM_LOG_IDENTITY") == "1"
+    eff_freeze_selfhead = os.environ.get("SM_FREEZE_SELFHEAD") == "1"
+
     train_clicked = bool(train_button.value) or _script
     return (
         eff_aws,
@@ -273,6 +277,8 @@ def _(
         eff_clip,
         eff_detach,
         eff_epochs,
+        eff_freeze_selfhead,
+        eff_log_identity,
         eff_out,
         eff_save_dir,
         eff_save_epochs,
@@ -555,6 +561,7 @@ def _(
 
 @app.cell
 def _(
+    C,
     F,
     LR,
     MOMENTUM,
@@ -583,6 +590,8 @@ def _(
         detach_target,
         save_epochs,
         save_dir,
+        log_identity,
+        freeze_selfhead,
     ):
         """Train every (aw, seed) in one AW group together; return raw per-model data."""
         data = prepare_imdb()
@@ -622,6 +631,14 @@ def _(
             list(params.values()), lr=LR, momentum=MOMENTUM, nesterov=False
         )
         gens = [torch.Generator() for _ in range(M)]
+
+        if freeze_selfhead:
+            _init_self_w = params["Wo"][:, C:, :].detach().clone()
+            _init_self_b = params["bo"][:, C:].detach().clone()
+        sm_hist = [[] for _ in range(M)]
+        id_hist = [[] for _ in range(M)]
+        bs_hist = [[] for _ in range(M)]
+        share_hist = [[] for _ in range(M)]
 
         sd_hist = [[] for _ in range(M)]
         acc_hist = [[] for _ in range(M)]
@@ -688,6 +705,8 @@ def _(
             if device.type == "mps":
                 torch.mps.synchronize()
             start = time.perf_counter()
+            _sm_epoch_sum = torch.zeros(M, device=device)
+            _n_batches = 0
 
             for lo in range(0, N, batch_size):
                 hi = min(lo + batch_size, N)
@@ -714,11 +733,70 @@ def _(
                 target = a.detach() if detach_target else a
                 sm = (a_hat - target).pow(2).mean(dim=(1, 2))
                 loss = ce + aws_t * sm
+                if log_identity:
+                    _sm_epoch_sum += sm.detach()
+                    _n_batches += 1
+                    if lo == 0:
+                        # Same-batch autograd probes; separate from the training
+                        # backward and discarded, so they cannot affect training.
+                        _ce_grads = torch.autograd.grad(
+                            ce.sum(),
+                            [params["Wh"], params["bh"]],
+                            retain_graph=True,
+                            allow_unused=True,
+                        )
+                        _sm_grads = torch.autograd.grad(
+                            (aws_t * sm).sum(),
+                            [params["Wh"], params["bh"]],
+                            retain_graph=True,
+                            allow_unused=True,
+                        )
+                        for _m in range(M):
+                            _ce_parts = [
+                                _g[_m].reshape(-1)
+                                for _g in _ce_grads
+                                if _g is not None
+                            ]
+                            _sm_parts = [
+                                _g[_m].reshape(-1)
+                                for _g in _sm_grads
+                                if _g is not None
+                            ]
+                            _ce_norm = (
+                                torch.linalg.vector_norm(
+                                    torch.cat(_ce_parts)
+                                )
+                                if _ce_parts
+                                else torch.zeros((), device=device)
+                            )
+                            _sm_norm = (
+                                torch.linalg.vector_norm(
+                                    torch.cat(_sm_parts)
+                                )
+                                if _sm_parts
+                                else torch.zeros((), device=device)
+                            )
+                            _denom = float(_ce_norm + _sm_norm)
+                            _share = (
+                                float(_sm_norm) / _denom
+                                if _denom > 0
+                                else float("nan")
+                            )
+                            share_hist[_m].append(
+                                float("nan")
+                                if models[_m][0] == 0
+                                else _share
+                            )
+                        del _ce_grads, _sm_grads
                 finite = torch.isfinite(loss)
                 if bool((alive & ~finite).any()):
                     alive = mark_diverged(alive & ~finite, alive, epoch)
                 safe = torch.where(alive, loss, torch.zeros_like(loss))
                 safe.sum().backward()
+                if freeze_selfhead:
+                    with torch.no_grad():
+                        params["Wo"].grad[:, C:, :] = 0.0
+                        params["bo"].grad[:, C:] = 0.0
                 if bool((~finite).any()) or not bool(alive.all()):
                     sanitize_grads(alive)
                 if grad_clip > 0:
@@ -733,11 +811,41 @@ def _(
                             list(params.values()), grad_clip
                         )
                 opt.step()
+                if freeze_selfhead:
+                    with torch.no_grad():
+                        params["Wo"][:, C:, :].copy_(_init_self_w)
+                        params["bo"][:, C:].copy_(_init_self_b)
                 opt.zero_grad()
 
             weights_ok = finite_weights()
             if bool((alive & ~weights_ok).any()):
                 alive = mark_diverged(alive & ~weights_ok, alive, epoch)
+
+            if log_identity:
+                _sm_batch_mean = (
+                    (_sm_epoch_sum / _n_batches).tolist()
+                    if _n_batches
+                    else [float("nan")] * M
+                )
+                with torch.no_grad():
+                    _self_w = params["Wo"][:, C:, :]
+                    _self_h = _self_w.shape[1]
+                    _eye = torch.eye(_self_h, device=device)
+                    _id_vec = torch.linalg.matrix_norm(
+                        _self_w - _eye, ord="fro", dim=(1, 2)
+                    ) / float(_self_h) ** 0.5
+                    _bs_vec = torch.linalg.vector_norm(
+                        params["bo"][:, C:], dim=1
+                    )
+                for _m in range(M):
+                    if models[_m][0] == 0:
+                        sm_hist[_m].append(float("nan"))
+                        id_hist[_m].append(float("nan"))
+                        bs_hist[_m].append(float("nan"))
+                    else:
+                        sm_hist[_m].append(_sm_batch_mean[_m])
+                        id_hist[_m].append(_id_vec[_m].item())
+                        bs_hist[_m].append(_bs_vec[_m].item())
 
             sd_vec = classifier_sd(params, M)
             acc_vec = evaluate_batched(
@@ -844,6 +952,10 @@ def _(
                 "final_acc": acc_hist[m][-1],
                 "diverged": diverged_epoch[m] is not None,
                 "diverged_epoch": diverged_epoch[m],
+                "sm_loss": sm_hist[m] if log_identity else None,
+                "id_dist": id_hist[m] if log_identity else None,
+                "b_s_norm": bs_hist[m] if log_identity else None,
+                "sm_grad_share": share_hist[m] if log_identity else None,
             }
             for m, (aw, seed) in enumerate(models)
         ]
@@ -872,6 +984,8 @@ def _(
             "weights": weights,
             "epoch_seconds": epoch_seconds,
             "vocab_info": data["vocab_info"],
+            "log_identity": bool(log_identity),
+            "freeze_selfhead": bool(freeze_selfhead),
         }
 
     return (train_group,)
@@ -886,6 +1000,8 @@ def _(
     eff_clip,
     eff_detach,
     eff_epochs,
+    eff_freeze_selfhead,
+    eff_log_identity,
     eff_save_dir,
     eff_save_epochs,
     eff_seeds,
@@ -913,6 +1029,8 @@ def _(
                         eff_detach,
                         eff_save_epochs,
                         eff_save_dir,
+                        eff_log_identity,
+                        eff_freeze_selfhead,
                     )
                 )
                 _bar.update(subtitle=f"AW={_group} done")
@@ -976,6 +1094,8 @@ def _(
         for _group in runs:
             for _model in _group["models"]:
                 by_aw.setdefault(_model["aw"], []).append(_model)
+        _log_identity = any(g.get("log_identity") for g in runs)
+        _freeze_selfhead = any(g.get("freeze_selfhead") for g in runs)
 
         results = {}
         for _aw in eff_aws:
@@ -1026,6 +1146,29 @@ def _(
                 "acc_mean": _acc_mean,
                 "acc_ci": _acc_ci,
             }
+            if _log_identity:
+                _identity = {}
+                for _name in (
+                    "sm_loss",
+                    "id_dist",
+                    "b_s_norm",
+                    "sm_grad_share",
+                ):
+                    _seed_lists = [m[_name] for m in _ms]
+                    _ok_lists = [m[_name] for m in _ok]
+                    if _ok_lists:
+                        _mean = (
+                            np.asarray(_ok_lists, dtype=float)
+                            .mean(axis=0)
+                            .tolist()
+                        )
+                    else:
+                        _mean = []
+                    _identity[_name] = {
+                        "mean": _mean,
+                        "seeds": _seed_lists,
+                    }
+                results[f"{_aw:g}"]["identity"] = _identity
 
         fig4 = {
             "config": {
@@ -1038,6 +1181,8 @@ def _(
                 "nesterov": False,
                 "grad_clip": eff_clip,
                 "detach_target": eff_detach,
+                "log_identity": bool(_log_identity),
+                "freeze_selfhead": bool(_freeze_selfhead),
                 "smoke": smoke_test,
             },
             "device": {"type": device.type, "name": device_name},
