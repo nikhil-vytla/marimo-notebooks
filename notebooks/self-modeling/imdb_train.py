@@ -193,6 +193,12 @@ def _(
     epoch the pruned classifier (embedding, hidden `W`/`b`, output rows `[:2]`)
     is written to `{SM_SAVE_DIR}/epoch{E}/aw{aw:g}_seed{seed}.pt` alongside a
     `config.json`. Saving does not alter the trained weights.
+
+    `SM_SELFHEAD_LR_SCALE` (default `1.0`, the current behavior) multiplies the
+    gradient of the self-model output rows (rows `C:` of `Wo`/`bo`) after the
+    per-model clip, leaving the classifier rows and the body untouched. Values
+    below 1 slow the self-model head without changing the clip the rest of the
+    model sees.
     """)
     mo.vstack(
         [
@@ -269,6 +275,9 @@ def _(
     # Identity-map diagnostics, off by default and env-only (script mode).
     eff_log_identity = os.environ.get("SM_LOG_IDENTITY") == "1"
     eff_freeze_selfhead = os.environ.get("SM_FREEZE_SELFHEAD") == "1"
+    eff_selfhead_lr_scale = float(
+        os.environ.get("SM_SELFHEAD_LR_SCALE", "1.0")
+    )
 
     train_clicked = bool(train_button.value) or _script
     return (
@@ -283,6 +292,7 @@ def _(
         eff_save_dir,
         eff_save_epochs,
         eff_seeds,
+        eff_selfhead_lr_scale,
         smoke_test,
         train_clicked,
     )
@@ -592,6 +602,7 @@ def _(
         save_dir,
         log_identity,
         freeze_selfhead,
+        selfhead_lr_scale,
     ):
         """Train every (aw, seed) in one AW group together; return raw per-model data."""
         data = prepare_imdb()
@@ -846,6 +857,18 @@ def _(
                     sanitize_grads(alive)
                 if grad_clip > 0:
                     clip_grads_per_model()
+                if selfhead_lr_scale != 1.0:
+                    # Scale only the self-model rows (C:) of the output weight
+                    # and bias; classifier rows (:C) and the body are untouched.
+                    # This runs after the per-model clip on purpose: the clip
+                    # threshold still reflects the full gradient the classifier
+                    # and body see. Scaling the post-clip gradient is exact
+                    # because SGD momentum is 0, i.e. an lr of lr*scale for the
+                    # self-model rows. At AW=0 those rows already get zero
+                    # gradient, so this is a no-op there.
+                    with torch.no_grad():
+                        params["Wo"].grad[:, C:, :].mul_(selfhead_lr_scale)
+                        params["bo"].grad[:, C:].mul_(selfhead_lr_scale)
                 opt.step()
                 if freeze_selfhead:
                     # Belt-and-braces: momentum and weight decay are both zero
@@ -1052,6 +1075,7 @@ def _(
             "vocab_info": data["vocab_info"],
             "log_identity": bool(log_identity),
             "freeze_selfhead": bool(freeze_selfhead),
+            "selfhead_lr_scale": float(selfhead_lr_scale),
         }
 
     return (train_group,)
@@ -1071,6 +1095,7 @@ def _(
     eff_save_dir,
     eff_save_epochs,
     eff_seeds,
+    eff_selfhead_lr_scale,
     mo,
     train_clicked,
     train_group,
@@ -1097,6 +1122,7 @@ def _(
                         eff_save_dir,
                         eff_log_identity,
                         eff_freeze_selfhead,
+                        eff_selfhead_lr_scale,
                     )
                 )
                 _bar.update(subtitle=f"AW={_group} done")
@@ -1149,6 +1175,7 @@ def _(
     eff_clip,
     eff_detach,
     eff_epochs,
+    eff_selfhead_lr_scale,
     eff_seeds,
     np,
     runs,
@@ -1249,6 +1276,7 @@ def _(
                 "detach_target": eff_detach,
                 "log_identity": bool(_log_identity),
                 "freeze_selfhead": bool(_freeze_selfhead),
+                "selfhead_lr_scale": eff_selfhead_lr_scale,
                 "smoke": smoke_test,
             },
             "device": {"type": device.type, "name": device_name},
@@ -1422,6 +1450,16 @@ def _(mo):
       untouched. `SM_CLIP=0` (or the UI) skips clipping entirely. Results produced
       before this fix used one global norm across all stacked models, which coupled
       the models and over-clipped each by roughly `sqrt(M)`.
+    - **Slowed self-model head.** `SM_SELFHEAD_LR_SCALE` (default `1.0`) scales
+      the self-model output-row gradient (`Wo[:, C:, :]` and `bo[:, C:]`) after the
+      per-model clip, so the clip threshold still reflects the full gradient the
+      classifier and body see; with SGD momentum 0 this is exactly an lr of
+      `lr * scale` for those rows. At AW=0 the self-model rows already receive zero
+      gradient, so the setting is a no-op there, and classifier rows and the body
+      are never scaled. It composes with `SM_LOG_IDENTITY`: the logged per-epoch
+      quantities simply reflect the scaled self-model updates. The value is
+      recorded in `imdb_fig4.json` under `config.selfhead_lr_scale` and is part of
+      the `train_group` persistent-cache key.
     - **Divergence guard.** If a model's loss or any of its weights becomes
       non-finite, that model stops updating (its gradient rows are masked before the
       per-model clip, so it cannot corrupt the others), keeps training the rest, and is
