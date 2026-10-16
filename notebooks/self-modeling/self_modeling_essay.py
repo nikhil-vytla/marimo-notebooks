@@ -1881,22 +1881,101 @@ def _(mo):
     The third experiment is sentiment classification on IMDB with an
     embedding bag and a hidden layer. Figure 4A plots classifier
     weight SD, 4B is RLCT, and 4C is accuracy. We ran the training
-    panels and estimated 4B's RLCT. Pick a variant; the main run is
-    batch 64 with gradient clipping, the one that matches the paper's
-    batch size.
+    panels and estimated 4B's RLCT. The main run is batch 64 with
+    per-model gradient clipping, the setting that matches the
+    paper's batch size; it is plotted by default below.
+    """)
+    return
+
+
+@app.cell
+def _(json, mo):
+    _main = json.loads(
+        (
+            mo.notebook_location()
+            / "public"
+            / "data"
+            / "imdb_fig4.json"
+        ).read_text()
+    )
+    _prefix = json.loads(
+        (
+            mo.notebook_location()
+            / "public"
+            / "data"
+            / "imdb_fig4_variants.json"
+        ).read_text()
+    )["variants"]["b64_clip"]["results"]
+    _rlct = json.loads(
+        (
+            mo.notebook_location()
+            / "public"
+            / "data"
+            / "imdb_fig4b.json"
+        ).read_text()
+    )
+
+    def _sd_acc(_results):
+        _sd = [
+            float(_results[f"{_aw:g}"]["sd_mean"][-1])
+            for _aw in (0.0, 100.0, 500.0)
+        ]
+        _acc = [
+            float(_results[f"{_aw:g}"]["acc_mean"])
+            for _aw in (0.0, 100.0, 500.0)
+        ]
+        return _sd, _acc
+
+    def _fmt(_values):
+        return " / ".join(f"{_v:.3f}" for _v in _values)
+
+    _sd_before, _acc_before = _sd_acc(_prefix)
+    _sd_after, _acc_after = _sd_acc(_main["results"])
+    _rlct_before = [
+        float(_rlct["superseded_global_clip_run"]["rlct"][_k]["mean"])
+        for _k in ("0", "100", "500")
+    ]
+    _rlct_after = [
+        float(_rlct["rlct"][_k]["mean"])
+        for _k in ("0", "100", "500")
+    ]
+    mo.md(f"""
+    /// admonition | Bug we found: coupled gradient clipping
+    Our first IMDB runs clipped gradients with one global norm
+    across all stacked models, which coupled otherwise-independent
+    runs and over-clipped each by about $\\sqrt{{M}}$. A
+    frozen-head control caught it: AW = 0 lost accuracy even though
+    its self-model term carries zero weight, because the diverging
+    frozen models inflated the shared norm. Clipping is now
+    per-model, and the conclusions did not change. Between the
+    superseded and corrected runs the final SD moved from
+    {_fmt(_sd_before)} to {_fmt(_sd_after)}, accuracy from
+    {_acc_before[0]:.1%} to {_acc_after[0]:.1%}, and RLCT from
+    {_fmt(_rlct_before)} to {_fmt(_rlct_after)}. Every quantity
+    stays flat across AW and far below the paper's scale.
+    ///
     """)
     return
 
 
 @app.cell
 def _(json, mo, pd):
-    _path = (
-        mo.notebook_location()
-        / "public"
-        / "data"
-        / "imdb_fig4_variants.json"
+    _main = json.loads(
+        (
+            mo.notebook_location()
+            / "public"
+            / "data"
+            / "imdb_fig4.json"
+        ).read_text()
     )
-    _raw = json.loads(_path.read_text())
+    _raw = json.loads(
+        (
+            mo.notebook_location()
+            / "public"
+            / "data"
+            / "imdb_fig4_variants.json"
+        ).read_text()
+    )
 
     IMDB_AWS = [0.0, 100.0, 500.0]
     IMDB_COLORS = {
@@ -1906,17 +1985,28 @@ def _(json, mo, pd):
     }
     IMDB_PAPER_4A = {0.0: 2.05, 100.0: 1.65, 500.0: 0.75}
     IMDB_OPTIONS = {
-        "batch 64, grad clip (main)": "b64_clip",
-        "batch 512, grad clip": "b512_clip",
-        "batch 64, no grad clip": "b64_noclip",
-        "batch 512, no detach": "b512_nodetach",
+        "main: batch 64, per-model clip (corrected)": "main",
+        "pre-fix: batch 512, grad clip": "b512_clip",
+        "pre-fix: batch 64, grad clip": "b64_clip",
+        "pre-fix: batch 64, no grad clip (unaffected)": "b64_noclip",
+        "pre-fix: batch 512, no detach": "b512_nodetach",
     }
+    IMDB_LABELS = {
+        _value: _key for _key, _value in IMDB_OPTIONS.items()
+    }
+    _runs = {"main": _main["results"]}
+    _runs.update(
+        {
+            _key: _variant["results"]
+            for _key, _variant in _raw["variants"].items()
+        }
+    )
 
     _rows = []
     _summary = []
-    for _key, _variant in _raw["variants"].items():
+    for _key, _results in _runs.items():
         for _aw in IMDB_AWS:
-            _entry = _variant["results"][f"{_aw:g}"]
+            _entry = _results[f"{_aw:g}"]
             for _epoch, (_mean, _half) in enumerate(
                 zip(_entry["sd_mean"], _entry["sd_ci"])
             ):
@@ -1948,6 +2038,7 @@ def _(json, mo, pd):
         IMDB_AWS,
         IMDB_COLORS,
         IMDB_FIG4A,
+        IMDB_LABELS,
         IMDB_OPTIONS,
         IMDB_PAPER_4A,
         IMDB_SUMMARY,
@@ -1959,7 +2050,10 @@ def _(IMDB_OPTIONS, mo):
     imdb_variant = mo.ui.dropdown(
         options=IMDB_OPTIONS,
         value=next(iter(IMDB_OPTIONS)),
-        label="IMDB run variant",
+        label=(
+            "IMDB run variant (non-main entries were trained "
+            "before the clipping fix; b64_noclip unaffected)"
+        ),
     )
     imdb_variant
     return (imdb_variant,)
@@ -1970,6 +2064,7 @@ def _(
     IMDB_AWS,
     IMDB_COLORS,
     IMDB_FIG4A,
+    IMDB_LABELS,
     IMDB_PAPER_4A,
     alt,
     imdb_variant,
@@ -2054,7 +2149,10 @@ def _(
     _chart = (_band + _line + _points).properties(
         width=600,
         height=340,
-        title=f"IMDB SD vs epoch, {imdb_variant.value}",
+        title=(
+            "IMDB SD vs epoch, "
+            f"{IMDB_LABELS[imdb_variant.value]}"
+        ),
     )
     mo.ui.altair_chart(_chart)
     return
@@ -2079,7 +2177,7 @@ def _(IMDB_SUMMARY, mo):
 @app.cell
 def _(IMDB_PAPER_4A, IMDB_SUMMARY, mo):
     _base = IMDB_SUMMARY[
-        (IMDB_SUMMARY["variant"] == "b64_clip")
+        (IMDB_SUMMARY["variant"] == "main")
         & (IMDB_SUMMARY["aw"] == 0.0)
     ].iloc[0]
     _gap = IMDB_PAPER_4A[0.0] / float(_base["final_sd"])
@@ -2108,14 +2206,16 @@ def _(IMDB_PAPER_4A, IMDB_SUMMARY, mo):
     self-modeling term does to IMDB, our runs show almost none of
     it.
 
-    **Hypothesis, untested.** Our output layer predicts the hidden
+    **Hypothesis.** Our output layer predicts the hidden
     activations from those same activations. If the self-model rows
-    can learn to copy their input, they can drive the self-model
-    loss to zero with an identity map, and then the self-model term
+    can learn to map their input to itself, they can drive the
+    self-model loss to near zero, and then the self-model term
     stops pushing on the rest of the network. With SGD at learning
     rate 0.1 and AW up to 500, that shortcut is found quickly. This
     would explain both failures at once: no AW separation and no
-    movement in the classifier weights. We have not tested it.
+    movement in the classifier weights. The diagnostics in the
+    next section support this, though on their own they do not
+    prove it.
     """)
     return
 
@@ -2230,10 +2330,182 @@ def _(IMDB_FIG4B, mo):
     {_spread:.2f}), about **{_ratio:.0f}x** below the paper's
     baseline of 13.7 and nowhere near its 13.7 -> 5.2 slope. This
     matches the flat weight SD above and is consistent with the
-    identity-map hypothesis we have not yet tested. The estimator
+    identity-map picture supported by the diagnostics below. The
+    estimator
     follows the paper's supplement settings (devinterp 2.0.1,
     lr 1e-3, localization 10, nbeta = batch/log(batch) at batch 64,
     4 chains x 2000 draws), recorded in `imdb_fig4b.json`.
+    """)
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""
+    ## Why doesn't IMDB feel the pressure?
+
+    The identity-map picture says the self-model term should keep
+    pushing on the network until the self-model rows can predict
+    the hidden activations, at which point the pressure disappears.
+    We logged the self-model loss, the distance of the self-model
+    rows from the identity, and the self-model share of the
+    hidden-layer gradient on shorter diagnostic runs (3 seeds; IMDB
+    100 epochs, MNIST 50) that mirror the main setups.
+    """)
+    return
+
+
+@app.cell
+def _(json, mo, pd):
+    IDENTITY = json.loads(
+        (
+            mo.notebook_location()
+            / "public"
+            / "data"
+            / "identity_diagnostics.json"
+        ).read_text()
+    )
+    _rows = []
+    for _aw in (100.0, 500.0):
+        _share = IDENTITY["imdb_normal"]["results"][
+            f"{_aw:g}"
+        ]["identity"]["sm_grad_share"]["mean"]
+        for _epoch, _value in enumerate(_share, start=1):
+            _rows.append(
+                {
+                    "series": f"IMDB AW={_aw:g}",
+                    "source": "IMDB (100 epochs)",
+                    "epoch": _epoch,
+                    "share": float(_value),
+                }
+            )
+    for _aw in (10.0, 50.0):
+        _share = IDENTITY["mnist_h512"]["results"]["512"][
+            "aws"
+        ][f"{_aw:g}"]["identity"]["sm_grad_share"]["mean"]
+        for _epoch, _value in enumerate(_share, start=1):
+            _rows.append(
+                {
+                    "series": f"MNIST AW={_aw:g}",
+                    "source": "MNIST (50 epochs)",
+                    "epoch": _epoch,
+                    "share": float(_value),
+                }
+            )
+    IDENTITY_SHARE = pd.DataFrame(_rows)
+    return IDENTITY, IDENTITY_SHARE
+
+
+@app.cell
+def _(IDENTITY_SHARE, alt, mo):
+    _order = [
+        "IMDB AW=100",
+        "IMDB AW=500",
+        "MNIST AW=10",
+        "MNIST AW=50",
+    ]
+    _scale = alt.Scale(
+        domain=_order,
+        range=["#00e000", "#0000ff", "#f58518", "#d62728"],
+    )
+    _line = (
+        alt.Chart(IDENTITY_SHARE)
+        .mark_line(strokeWidth=2)
+        .encode(
+            x=alt.X(
+                "epoch:Q",
+                title="Epoch",
+                scale=alt.Scale(type="log"),
+            ),
+            y=alt.Y(
+                "share:Q",
+                title=(
+                    "Self-model share of the "
+                    "hidden-layer gradient"
+                ),
+                scale=alt.Scale(domain=[0.0, 1.0]),
+            ),
+            color=alt.Color(
+                "series:N",
+                scale=_scale,
+                legend=alt.Legend(
+                    title=None, orient="bottom", columns=2
+                ),
+            ),
+            tooltip=[
+                alt.Tooltip("series:N"),
+                alt.Tooltip("epoch:Q"),
+                alt.Tooltip("share:Q", format=".3f"),
+            ],
+        )
+        .properties(
+            width=600,
+            height=340,
+            title="Self-model pressure over training",
+        )
+    )
+    mo.ui.altair_chart(_line)
+    return
+
+
+@app.cell
+def _(IDENTITY, mo):
+    _imdb = IDENTITY["imdb_normal"]["results"]
+    _mnist = IDENTITY["mnist_h512"]["results"]["512"]["aws"]
+    _frozen = IDENTITY["imdb_frozen"]["results"]
+
+    _sm100_5 = float(_imdb["100"]["identity"]["sm_loss"]["mean"][4])
+    _sm500_5 = float(_imdb["500"]["identity"]["sm_loss"]["mean"][4])
+    _share100_20 = float(
+        _imdb["100"]["identity"]["sm_grad_share"]["mean"][19]
+    )
+    _share500_20 = float(
+        _imdb["500"]["identity"]["sm_grad_share"]["mean"][19]
+    )
+    _id100 = float(_imdb["100"]["identity"]["id_dist"]["mean"][-1])
+    _id500 = float(_imdb["500"]["identity"]["id_dist"]["mean"][-1])
+    _mn10_50 = float(
+        _mnist["10"]["identity"]["sm_grad_share"]["mean"][-1]
+    )
+    _mn50_50 = float(
+        _mnist["50"]["identity"]["sm_grad_share"]["mean"][-1]
+    )
+    _fz_loss = max(
+        float(_frozen["100"]["identity"]["sm_loss"]["mean"][-1]),
+        float(_frozen["500"]["identity"]["sm_loss"]["mean"][-1]),
+    )
+    _fz_acc = float(_frozen["100"]["acc_mean"])
+
+    mo.md(f"""
+    On IMDB the self-model loss collapses almost immediately,
+    **{_sm100_5:.1e}** at AW 100 and **{_sm500_5:.1e}** at AW 500
+    by epoch 5, and the self-model share of the hidden-layer
+    gradient falls to **{_share100_20:.0%}** and
+    **{_share500_20:.0%}** by epoch 20. On MNIST the share is still
+    **{_mn10_50:.0%}** at AW 10 and **{_mn50_50:.0%}** at AW 50 at
+    the end of its 50-epoch run. The pressure
+    persists where the effect appears and evaporates where it does
+    not.
+
+    Why is IMDB so easy? The hidden layer is a linear map of a
+    64-dimensional embedding, so its 128 activations live in a
+    64-dimensional subspace; many linear maps reproduce them
+    exactly, and the self-model rows can drive the loss to zero
+    without becoming the identity. They do not: the relative
+    distance $\\lVert W_s - I\\rVert_F / \\lVert I\\rVert_F$ is still
+    **{_id100:.2f}** at AW 100 and **{_id500:.2f}** at AW 500. The
+    shortcut is a projection, not a copy.
+
+    We tried to make the test causal by freezing the self-model
+    rows at their random init. Both AW 100 and AW 500 ran away
+    (self-model loss to about **{_fz_loss:.0e}**, accuracy
+    **{_fz_acc:.0%}**), because a fixed random head with a
+    detached, moving target has no stable solution. That control
+    is therefore inconclusive: it breaks the run rather than
+    holding the shortcut fixed. On this evidence the mechanism is
+    supported by correlation, not proof. A slowed-head control,
+    annealing the self-model rows instead of freezing them, is the
+    natural next test.
     """)
     return
 
@@ -2252,9 +2524,9 @@ def _(mo):
     | 3A | no | SD ordering inverted: baseline is the narrowest curve. |
     | 3B | no | RLCT flat across AW and about 3x below the paper's scale. |
     | 3C | yes | Accuracy 0.921-0.923, flat across AW, matching 0.918-0.920. |
-    | 4A | no | No AW separation; SD about 10x below the paper. |
-    | 4B | no | RLCT flat across AW (~2.4 vs paper 13.7 -> 5.2). |
-    | 4C | partly | Accuracy 84.9% near the paper's range but flat across AW. |
+    | 4A | no | Corrected run: SD 0.232 at every AW, ~9x below the paper's 2.05; no AW separation. |
+    | 4B | no | Corrected run: RLCT flat across AW (2.10/2.13/2.13 vs paper 13.7 -> 5.2). |
+    | 4C | partly | Corrected accuracy 85.2%, near the paper's range but flat across AW. |
     """)
     return
 

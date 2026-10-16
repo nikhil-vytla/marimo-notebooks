@@ -266,6 +266,10 @@ def _(
         _save_default
     )
 
+    # Identity-map diagnostics, off by default and env-only (script mode).
+    eff_log_identity = os.environ.get("SM_LOG_IDENTITY") == "1"
+    eff_freeze_selfhead = os.environ.get("SM_FREEZE_SELFHEAD") == "1"
+
     train_clicked = bool(train_button.value) or _script
     return (
         eff_aws,
@@ -273,6 +277,8 @@ def _(
         eff_clip,
         eff_detach,
         eff_epochs,
+        eff_freeze_selfhead,
+        eff_log_identity,
         eff_out,
         eff_save_dir,
         eff_save_epochs,
@@ -555,6 +561,7 @@ def _(
 
 @app.cell
 def _(
+    C,
     F,
     LR,
     MOMENTUM,
@@ -583,6 +590,8 @@ def _(
         detach_target,
         save_epochs,
         save_dir,
+        log_identity,
+        freeze_selfhead,
     ):
         """Train every (aw, seed) in one AW group together; return raw per-model data."""
         data = prepare_imdb()
@@ -623,6 +632,19 @@ def _(
         )
         gens = [torch.Generator() for _ in range(M)]
 
+        if freeze_selfhead:
+            # Self-model rows (C:) are frozen and restored after every step;
+            # classifier rows (:C) stay in the optimizer. The init copies are
+            # also what the AW=0 guard below compares against.
+            _init_self_w = params["Wo"][:, C:, :].detach().clone()
+            _init_self_b = params["bo"][:, C:].detach().clone()
+            _init_cls_w = params["Wo"][:, :C, :].detach().clone()
+            _init_cls_b = params["bo"][:, :C].detach().clone()
+        sm_hist = [[] for _ in range(M)]
+        id_hist = [[] for _ in range(M)]
+        bs_hist = [[] for _ in range(M)]
+        share_hist = [[] for _ in range(M)]
+
         sd_hist = [[] for _ in range(M)]
         acc_hist = [[] for _ in range(M)]
         diverged_epoch = [None] * M
@@ -641,8 +663,8 @@ def _(
         def sanitize_grads(alive_mask):
             # A dead model can still emit NaN/inf gradients (0 upstream times a
             # NaN local Jacobian). Replace non-finite grads with zero and drop
-            # the dead rows entirely before the global-norm clip, otherwise one
-            # bad model would poison every other model's gradient.
+            # the dead rows entirely before the per-model clip, otherwise a
+            # NaN would poison that model's own norm.
             _emb_g = params["emb"].grad
             if _emb_g is not None:
                 _emb_g.nan_to_num_(nan=0.0, posinf=0.0, neginf=0.0)
@@ -652,6 +674,41 @@ def _(
                 if _g is not None:
                     _g.nan_to_num_(nan=0.0, posinf=0.0, neginf=0.0)
                     _g[~alive_mask] = 0.0
+
+        def per_model_sq_norm():
+            # Squared L2 norm of each model's own gradients. `emb` stores every
+            # model's vocabulary table stacked along dim 0, so fold vocab_size
+            # into the model axis before reducing.
+            _sq = torch.zeros(M, device=device)
+            _emb_g = params["emb"].grad
+            if _emb_g is not None:
+                _sq = _sq + _emb_g.view(M, -1).pow(2).sum(dim=1)
+            for _key in ("Wh", "bh", "Wo", "bo"):
+                _g = params[_key].grad
+                if _g is not None:
+                    _sq = _sq + _g.view(M, -1).pow(2).sum(dim=1)
+            return _sq
+
+        def clip_grads_per_model():
+            # Clip each model with its own norm, matching clip_grad_norm_ run on
+            # that model alone. A single global norm over the whole stack would
+            # couple otherwise-independent models and over-clip each by ~sqrt(M).
+            _sq = per_model_sq_norm()
+            if not bool(torch.isfinite(_sq).all()):
+                # A finite loss can still hide an inf gradient; a non-finite
+                # squared norm would poison that model's scale. Wipe and retry.
+                sanitize_grads(alive)
+                _sq = per_model_sq_norm()
+            _scale = torch.clamp(
+                grad_clip / (_sq.sqrt() + 1e-6), max=1.0
+            )
+            _emb_g = params["emb"].grad
+            if _emb_g is not None:
+                _emb_g.view(M, -1).mul_(_scale.unsqueeze(1))
+            for _key in ("Wh", "bh", "Wo", "bo"):
+                _g = params[_key].grad
+                if _g is not None:
+                    _g.mul_(_scale.reshape([M] + [1] * (_g.dim() - 1)))
 
         def finite_weights():
             with torch.no_grad():
@@ -688,6 +745,8 @@ def _(
             if device.type == "mps":
                 torch.mps.synchronize()
             start = time.perf_counter()
+            _sm_epoch_sum = torch.zeros(M, device=device)
+            _n_batches = 0
 
             for lo in range(0, N, batch_size):
                 hi = min(lo + batch_size, N)
@@ -714,30 +773,118 @@ def _(
                 target = a.detach() if detach_target else a
                 sm = (a_hat - target).pow(2).mean(dim=(1, 2))
                 loss = ce + aws_t * sm
+                if log_identity:
+                    _sm_epoch_sum += sm.detach()
+                    _n_batches += 1
+                    if lo == 0:
+                        # Same-batch autograd probes; separate from the training
+                        # backward and discarded, so they cannot affect training.
+                        _ce_grads = torch.autograd.grad(
+                            ce.sum(),
+                            [params["Wh"], params["bh"]],
+                            retain_graph=True,
+                            allow_unused=True,
+                        )
+                        _sm_grads = torch.autograd.grad(
+                            (aws_t * sm).sum(),
+                            [params["Wh"], params["bh"]],
+                            retain_graph=True,
+                            allow_unused=True,
+                        )
+                        for _m in range(M):
+                            _ce_parts = [
+                                _g[_m].reshape(-1)
+                                for _g in _ce_grads
+                                if _g is not None
+                            ]
+                            _sm_parts = [
+                                _g[_m].reshape(-1)
+                                for _g in _sm_grads
+                                if _g is not None
+                            ]
+                            _ce_norm = (
+                                torch.linalg.vector_norm(
+                                    torch.cat(_ce_parts)
+                                )
+                                if _ce_parts
+                                else torch.zeros((), device=device)
+                            )
+                            _sm_norm = (
+                                torch.linalg.vector_norm(
+                                    torch.cat(_sm_parts)
+                                )
+                                if _sm_parts
+                                else torch.zeros((), device=device)
+                            )
+                            _denom = float(_ce_norm + _sm_norm)
+                            _share = (
+                                float(_sm_norm) / _denom
+                                if _denom > 0
+                                else float("nan")
+                            )
+                            share_hist[_m].append(
+                                float("nan")
+                                if models[_m][0] == 0
+                                else _share
+                            )
+                        del _ce_grads, _sm_grads
                 finite = torch.isfinite(loss)
                 if bool((alive & ~finite).any()):
                     alive = mark_diverged(alive & ~finite, alive, epoch)
                 safe = torch.where(alive, loss, torch.zeros_like(loss))
                 safe.sum().backward()
+                if freeze_selfhead:
+                    # Zero only the self-model rows. The stacked output tensors
+                    # carry a leading model dimension, so slicing along dim 1
+                    # (and dim 1 for the bias) leaves every model's classifier
+                    # rows (:C) with their full gradient. The clip below then
+                    # sees the same classifier gradients as an unfrozen run.
+                    with torch.no_grad():
+                        params["Wo"].grad[:, C:, :] = 0.0
+                        params["bo"].grad[:, C:] = 0.0
                 if bool((~finite).any()) or not bool(alive.all()):
                     sanitize_grads(alive)
                 if grad_clip > 0:
-                    _norm = torch.nn.utils.clip_grad_norm_(
-                        list(params.values()), grad_clip
-                    )
-                    if not bool(torch.isfinite(_norm)):
-                        # A finite loss can still hide an inf gradient; the first
-                        # clip then turns every grad into NaN. Wipe and re-clip.
-                        sanitize_grads(alive)
-                        torch.nn.utils.clip_grad_norm_(
-                            list(params.values()), grad_clip
-                        )
+                    clip_grads_per_model()
                 opt.step()
+                if freeze_selfhead:
+                    # Belt-and-braces: momentum and weight decay are both zero
+                    # here, but re-copying the saved rows makes the freeze hold
+                    # for any optimizer that would otherwise nudge them.
+                    with torch.no_grad():
+                        params["Wo"][:, C:, :].copy_(_init_self_w)
+                        params["bo"][:, C:].copy_(_init_self_b)
                 opt.zero_grad()
 
             weights_ok = finite_weights()
             if bool((alive & ~weights_ok).any()):
                 alive = mark_diverged(alive & ~weights_ok, alive, epoch)
+
+            if log_identity:
+                _sm_batch_mean = (
+                    (_sm_epoch_sum / _n_batches).tolist()
+                    if _n_batches
+                    else [float("nan")] * M
+                )
+                with torch.no_grad():
+                    _self_w = params["Wo"][:, C:, :]
+                    _self_h = _self_w.shape[1]
+                    _eye = torch.eye(_self_h, device=device)
+                    _id_vec = torch.linalg.matrix_norm(
+                        _self_w - _eye, ord="fro", dim=(1, 2)
+                    ) / float(_self_h) ** 0.5
+                    _bs_vec = torch.linalg.vector_norm(
+                        params["bo"][:, C:], dim=1
+                    )
+                for _m in range(M):
+                    if models[_m][0] == 0:
+                        sm_hist[_m].append(float("nan"))
+                        id_hist[_m].append(float("nan"))
+                        bs_hist[_m].append(float("nan"))
+                    else:
+                        sm_hist[_m].append(_sm_batch_mean[_m])
+                        id_hist[_m].append(_id_vec[_m].item())
+                        bs_hist[_m].append(_bs_vec[_m].item())
 
             sd_vec = classifier_sd(params, M)
             acc_vec = evaluate_batched(
@@ -835,6 +982,33 @@ def _(
                     f"-> {_epoch_dir}"
                 )
 
+        if freeze_selfhead:
+            # Guard the AW=0 contract: the self-model term has zero weight, so
+            # freezing rows C: must leave baseline training untouched. Every
+            # still-alive AW=0 model has to have moved its classifier rows.
+            _aw0_alive = [
+                _m
+                for _m, (_aw, _seed) in enumerate(models)
+                if _aw == 0.0 and bool(alive[_m])
+            ]
+            if _aw0_alive:
+                with torch.no_grad():
+                    _cls_w_delta = (
+                        params["Wo"][:, :C, :] - _init_cls_w
+                    ).abs().amax(dim=(1, 2))
+                    _cls_b_delta = (
+                        params["bo"][:, :C] - _init_cls_b
+                    ).abs().amax(dim=1)
+                for _m in _aw0_alive:
+                    assert float(_cls_w_delta[_m]) > 0.0, (
+                        "SM_FREEZE_SELFHEAD at AW=0 froze classifier "
+                        f"weights for model {models[_m]}"
+                    )
+                    assert float(_cls_b_delta[_m]) > 0.0, (
+                        "SM_FREEZE_SELFHEAD at AW=0 froze classifier "
+                        f"biases for model {models[_m]}"
+                    )
+
         runs = [
             {
                 "aw": aw,
@@ -844,6 +1018,10 @@ def _(
                 "final_acc": acc_hist[m][-1],
                 "diverged": diverged_epoch[m] is not None,
                 "diverged_epoch": diverged_epoch[m],
+                "sm_loss": sm_hist[m] if log_identity else None,
+                "id_dist": id_hist[m] if log_identity else None,
+                "b_s_norm": bs_hist[m] if log_identity else None,
+                "sm_grad_share": share_hist[m] if log_identity else None,
             }
             for m, (aw, seed) in enumerate(models)
         ]
@@ -872,6 +1050,8 @@ def _(
             "weights": weights,
             "epoch_seconds": epoch_seconds,
             "vocab_info": data["vocab_info"],
+            "log_identity": bool(log_identity),
+            "freeze_selfhead": bool(freeze_selfhead),
         }
 
     return (train_group,)
@@ -886,6 +1066,8 @@ def _(
     eff_clip,
     eff_detach,
     eff_epochs,
+    eff_freeze_selfhead,
+    eff_log_identity,
     eff_save_dir,
     eff_save_epochs,
     eff_seeds,
@@ -913,6 +1095,8 @@ def _(
                         eff_detach,
                         eff_save_epochs,
                         eff_save_dir,
+                        eff_log_identity,
+                        eff_freeze_selfhead,
                     )
                 )
                 _bar.update(subtitle=f"AW={_group} done")
@@ -976,6 +1160,8 @@ def _(
         for _group in runs:
             for _model in _group["models"]:
                 by_aw.setdefault(_model["aw"], []).append(_model)
+        _log_identity = any(g.get("log_identity") for g in runs)
+        _freeze_selfhead = any(g.get("freeze_selfhead") for g in runs)
 
         results = {}
         for _aw in eff_aws:
@@ -1026,6 +1212,29 @@ def _(
                 "acc_mean": _acc_mean,
                 "acc_ci": _acc_ci,
             }
+            if _log_identity:
+                _identity = {}
+                for _name in (
+                    "sm_loss",
+                    "id_dist",
+                    "b_s_norm",
+                    "sm_grad_share",
+                ):
+                    _seed_lists = [m[_name] for m in _ms]
+                    _ok_lists = [m[_name] for m in _ok]
+                    if _ok_lists:
+                        _mean = (
+                            np.asarray(_ok_lists, dtype=float)
+                            .mean(axis=0)
+                            .tolist()
+                        )
+                    else:
+                        _mean = []
+                    _identity[_name] = {
+                        "mean": _mean,
+                        "seeds": _seed_lists,
+                    }
+                results[f"{_aw:g}"]["identity"] = _identity
 
         fig4 = {
             "config": {
@@ -1038,6 +1247,8 @@ def _(
                 "nesterov": False,
                 "grad_clip": eff_clip,
                 "detach_target": eff_detach,
+                "log_identity": bool(_log_identity),
+                "freeze_selfhead": bool(_freeze_selfhead),
                 "smoke": smoke_test,
             },
             "device": {"type": device.type, "name": device_name},
@@ -1204,12 +1415,16 @@ def _(mo):
       detached), which is the stronger regularizer. `SM_DETACH=0` (or the UI) trains
       against the live activations.
     - **Gradient clipping.** The detached self-modeling gradient at `lr=0.1` blows up
-      for AW=500 within the first epoch, so the global gradient norm is clipped at 1.0.
-      Baseline gradient norms stay below 0.5, so the baseline is untouched. `SM_CLIP=0`
-      (or the UI) skips the `clip_grad_norm_` call entirely.
+      for AW=500 within the first epoch, so gradients are clipped at norm 1.0
+      **per model**: each model's own norm is taken over its own parameters and
+      rescaled independently, which is identical to running `clip_grad_norm_` on
+      that model alone. Baseline gradient norms stay below 0.5, so the baseline is
+      untouched. `SM_CLIP=0` (or the UI) skips clipping entirely. Results produced
+      before this fix used one global norm across all stacked models, which coupled
+      the models and over-clipped each by roughly `sqrt(M)`.
     - **Divergence guard.** If a model's loss or any of its weights becomes
       non-finite, that model stops updating (its gradient rows are masked before the
-      global clip, so it cannot corrupt the others), keeps training the rest, and is
+      per-model clip, so it cannot corrupt the others), keeps training the rest, and is
       recorded with the epoch it happened. Diverged seeds are excluded from the
       means/CIs and reported per AW as `n_diverged`.
     - **Tokenizer / vocab.** `.split()` drops the empty-string token, giving 100,682
