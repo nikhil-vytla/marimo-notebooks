@@ -2634,6 +2634,164 @@ def _(json, mo):
 @app.cell
 def _(mo):
     mo.md(r"""
+    ## Exercise: forget the `.detach()`
+
+    The stop-gradient is one line, and easy to omit. Without it the
+    target is no longer a target: the squared error also pulls on the
+    activations it is supposed to predict. The cheapest way to reduce
+    the error can then be to move the target, not to predict it.
+
+    The CIFAR probe above already contains the answer, so predict
+    before you scroll back.
+
+    At AW = 2 on CIFAR-10, dropping `.detach()` will make the
+    classifier weight SD...
+    """)
+    return
+
+
+@app.cell
+def _(mo):
+    detach_guess = mo.ui.radio(
+        options={
+            "flip: no-detach becomes the widest curve": "flip",
+            "survive: same ordering, small change in level": "survive",
+            "nothing: the two curves are identical": "nothing",
+        },
+        label="Your prediction",
+    )
+    detach_reveal = mo.ui.checkbox(label="Reveal the probe")
+    mo.vstack([detach_guess, detach_reveal])
+    return detach_guess, detach_reveal
+
+
+@app.cell
+def _(CIFAR_PROBES, alt, detach_guess, detach_reveal, mo, pd):
+    _rows = []
+    for _variant, _label in (
+        ("base", "base (detached target)"),
+        ("nodetach", "no detach"),
+    ):
+        for _aw in (0.0, 2.0):
+            _row = CIFAR_PROBES[
+                (CIFAR_PROBES["variant"] == _variant)
+                & (CIFAR_PROBES["aw"] == _aw)
+            ].iloc[0]
+            _rows.append(
+                {
+                    "variant": _label,
+                    "aw": f"AW={_aw:g}",
+                    "sd": float(_row["sd_e50"]),
+                    "hidden": float(_row["hidden"][1]),
+                    "wnorm": float(_row["cls_wnorm"][1]),
+                }
+            )
+    _df = pd.DataFrame(_rows)
+
+    _chart = (
+        alt.Chart(_df)
+        .mark_line(point=True, strokeWidth=2)
+        .encode(
+            x=alt.X(
+                "aw:N",
+                title=None,
+                axis=alt.Axis(labelAngle=0),
+            ),
+            y=alt.Y(
+                "sd:Q",
+                title="Classifier weight SD (epoch 50)",
+                scale=alt.Scale(zero=False),
+            ),
+            color=alt.Color(
+                "variant:N",
+                scale=alt.Scale(
+                    domain=["base (detached target)", "no detach"],
+                    range=["#111827", "#b45309"],
+                ),
+                legend=alt.Legend(title=None, orient="bottom"),
+            ),
+            tooltip=[
+                alt.Tooltip("variant:N"),
+                alt.Tooltip("aw:N"),
+                alt.Tooltip("sd:Q", format=".4f"),
+            ],
+        )
+        .properties(width=520, height=260)
+    )
+
+    def _value(_variant, _aw):
+        _mask = (_df["variant"] == _variant) & (
+            _df["aw"] == f"AW={_aw:g}"
+        )
+        return _df[_mask].iloc[0]
+
+    _base = "base (detached target)"
+    _none = "no detach"
+    _b0 = float(_value(_base, 0.0)["sd"])
+    _b2 = float(_value(_base, 2.0)["sd"])
+    _n0 = float(_value(_none, 0.0)["sd"])
+    _n2 = float(_value(_none, 2.0)["sd"])
+    _h2 = float(_value(_base, 2.0)["hidden"])
+    _hn2 = float(_value(_none, 2.0)["hidden"])
+    _w2 = float(_value(_base, 2.0)["wnorm"])
+    _wn2 = float(_value(_none, 2.0)["wnorm"])
+    _pct = (_n2 - _b2) / _b2 * 100.0
+
+    if detach_guess.value is None:
+        _lead = "You did not pick an answer."
+        _kind = "neutral"
+    elif detach_guess.value == "survive":
+        _lead = "Right."
+        _kind = "success"
+    else:
+        _lead = "Not quite."
+        _kind = "warn"
+
+    _summary = mo.callout(
+        mo.md(
+            f"{_lead} At AW = 2, the classifier weight SD goes from "
+            f"**{_b2:.4f}** with the detached target to "
+            f"**{_n2:.4f}** without it ({_pct:+.1f}%). The AW = 0 "
+            f"values are {_b0:.4f} and {_n0:.4f}. The ordering "
+            f"survives either way."
+        ),
+        kind=_kind,
+    )
+
+    _prose = mo.md(f"""
+    The SD moves by only {abs(_pct):.1f}%, but the hidden activations
+    do more: their mean absolute value falls from {_h2:.3f} to
+    {_hn2:.3f}, and the classifier weight norm from {_w2:.2f} to
+    {_wn2:.2f}. Without the stop-gradient, the network can shrink
+    what it is asked to predict and let the classifier compensate.
+    That is the scale trade-off: smaller activations force larger
+    weights to keep the logits fixed. On this architecture it is too
+    small to flip the CIFAR ordering.
+
+    The chart's y-axis is zoomed; the gap at AW = 2 is
+    {abs(_n2 - _b2):.4f}.
+
+    So two things are true at once. The stop-gradient is the right
+    implementation of the paper's loss: without it, the target moves.
+    And on CIFAR it is not the explanation for our disagreement with
+    the paper. An ablation can be conceptually important and still
+    leave the gap you are chasing untouched.
+
+    Two seeds and 50 epochs: treat this as a sign, not a final answer.
+    """)
+    if detach_reveal.value:
+        _out = mo.vstack([_summary, _chart, _prose])
+    else:
+        _out = mo.md(
+            "Pick an answer above, then tick **Reveal the probe**."
+        )
+    _out
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""
     ## Scoreboard
 
     | paper panel | reproduced? | note |
@@ -2654,11 +2812,26 @@ def _(mo):
 
 @app.cell
 def _(mo):
-    mo.md("""
-    /// admonition | Coming soon: Exercise
-    What if you forget `.detach()`? A short interactive exercise:
-    predict what changes, then check. Placeholder for now.
-    ///
+    mo.md(r"""
+    ## Open questions
+
+    - **The CIFAR architecture gap.** The paper describes skip
+      connections from block 3 into the hidden layer. We could not map
+      that onto a standard ResNet-18, so our hidden layer sits after
+      global pooling. A faithful implementation is the highest-value
+      next experiment.
+    - **Is the identity mechanism the whole story?** The slow-head
+      control supports it on IMDB, but with 3 seeds, 100 epochs, and a
+      non-monotone effect. More seeds, a longer run, and a
+      scale-invariant read-out would turn a sign into a measurement.
+    - **Why does the IMDB self-model find a shortcut?** The hidden
+      layer is a linear map of a 64-dimensional embedding, so many
+      linear maps reproduce it. A rank diagnostic would say whether
+      the self-model rows learn a projection, as the weight distance
+      suggests.
+    - **What would falsify the story?** A run where the self-model
+      pressure stays high but the weights do not narrow, or one where
+      the weights narrow with the pressure held low.
     """)
     return
 
