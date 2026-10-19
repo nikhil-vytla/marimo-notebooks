@@ -59,3 +59,7 @@ A notebook change is done when all hold:
 - PEP 723: install dependencies with `--sandbox` (`just edit` does this).
 - molab: toggle GPU per notebook; sessions run at most 12h; shutdown after 90 min idle; only files uploaded through the sidebar or written with `mo.persistent_cache` persist.
 - molab link: `https://molab.marimo.io/github/<owner>/<repo>/blob/main/<path>`. It resolves once the file is on `main`; for a branch, replace `main` with the branch name.
+
+## Method
+
+For paper selection, essay structure, interaction patterns, and the marimo capability ladder, see [`docs/ESSAY-PLAYBOOK.md`](docs/ESSAY-PLAYBOOK.md).

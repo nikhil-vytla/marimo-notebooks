@@ -96,12 +96,13 @@ def _(mo):
     smoke = mo.ui.checkbox(
         value=False, label="Smoke test (2 epochs, 2 seeds)"
     )
+    detach = mo.ui.checkbox(value=True, label="Detach self-model target")
     train_button = mo.ui.run_button(label="Train")
-    return aws, epochs, hidden_sizes, seeds, smoke, train_button
+    return aws, detach, epochs, hidden_sizes, seeds, smoke, train_button
 
 
 @app.cell
-def _(aws, epochs, hidden_sizes, mo, seeds, smoke, train_button):
+def _(aws, detach, epochs, hidden_sizes, mo, seeds, smoke, train_button):
     mo.md(
         """
     ### Configuration
@@ -114,14 +115,14 @@ def _(aws, epochs, hidden_sizes, mo, seeds, smoke, train_button):
         [
             mo.hstack([hidden_sizes, aws], justify="start", gap=2),
             mo.hstack([seeds, epochs], justify="start", gap=2),
-            mo.hstack([smoke, train_button], justify="start", gap=2),
+            mo.hstack([smoke, detach, train_button], justify="start", gap=2),
         ]
     )
     return
 
 
 @app.cell
-def _(aws, epochs, hidden_sizes, mo, os, seeds, smoke, train_button):
+def _(aws, detach, epochs, hidden_sizes, mo, os, seeds, smoke, train_button):
     _mode = mo.app_meta().mode
     _script = _mode == "script"
     _smoke_env = os.environ.get("SMOKE") == "1"
@@ -139,6 +140,8 @@ def _(aws, epochs, hidden_sizes, mo, os, seeds, smoke, train_button):
     eff_epochs = 2 if smoke_test else int(epochs.value)
     eff_log_identity = os.environ.get("SM_LOG_IDENTITY") == "1"
     eff_out = os.environ.get("SM_OUT", "").strip()
+    _no_detach = os.environ.get("SM_NO_DETACH") == "1"
+    eff_detach = bool(detach.value) and not _no_detach
 
     if _script:
         if os.environ.get("SM_AWS"):
@@ -155,6 +158,7 @@ def _(aws, epochs, hidden_sizes, mo, os, seeds, smoke, train_button):
     train_clicked = bool(train_button.value) or _script
     return (
         eff_aws,
+        eff_detach,
         eff_epochs,
         eff_hidden,
         eff_log_identity,
@@ -234,7 +238,7 @@ def _(F, nn, np, torch):
         out = torch.baddbmm(b2.unsqueeze(1), a, W2.transpose(1, 2))
         return out[..., :10], out[..., 10:], a
 
-    def train_step(params, opt, xb, yb, aws):
+    def train_step(params, opt, xb, yb, aws, detach=True):
         logits, a_hat, a = forward_batched(params, xb)
         M, B = yb.shape
         ce = (
@@ -244,7 +248,8 @@ def _(F, nn, np, torch):
             .reshape(M, B)
             .mean(dim=1)
         )
-        sm = (a_hat - a.detach()).pow(2).mean(dim=(1, 2))
+        _target = a.detach() if detach else a
+        sm = (a_hat - _target).pow(2).mean(dim=(1, 2))
         (ce + aws * sm).sum().backward()
         opt.step()
         opt.zero_grad()
@@ -328,7 +333,15 @@ def _(
     train_step,
 ):
     @mo.persistent_cache
-    def train_hidden(hidden, aws_list, seeds_n, epochs, device_type, log_identity):
+    def train_hidden(
+        hidden,
+        aws_list,
+        seeds_n,
+        epochs,
+        device_type,
+        log_identity,
+        detach=True,
+    ):
         """Train every (aw, seed) for one hidden size; return raw per-model data."""
         device = torch.device(device_type)
         X, y, Xte, yte = load_mnist(device)
@@ -403,7 +416,8 @@ def _(
                         .reshape(M, -1)
                         .mean(dim=1)
                     )
-                    _sm = (_a_hat - _a.detach()).pow(2).mean(dim=(1, 2))
+                    _target = _a.detach() if detach else _a
+                    _sm = (_a_hat - _target).pow(2).mean(dim=(1, 2))
                     _ce_grads = torch.autograd.grad(
                         _ce.sum(),
                         [params[0], params[1]],
@@ -457,7 +471,9 @@ def _(
                         _ce_grads,
                         _sm_grads,
                     )
-                _ce_v, _sm_v = train_step(params, opt, X[idx], y[idx], aws)
+                _ce_v, _sm_v = train_step(
+                    params, opt, X[idx], y[idx], aws, detach=detach
+                )
                 if log_identity:
                     _sm_epoch_sum += _sm_v
                     _n_batches += 1
@@ -544,6 +560,7 @@ def _(
     device,
     device_name,
     eff_aws,
+    eff_detach,
     eff_epochs,
     eff_hidden,
     eff_log_identity,
@@ -566,6 +583,7 @@ def _(
                         eff_epochs,
                         device.type,
                         eff_log_identity,
+                        eff_detach,
                     )
                 )
                 bar.update(subtitle=f"hidden={_h} done")
@@ -602,6 +620,7 @@ def _(
     device,
     device_name,
     eff_aws,
+    eff_detach,
     eff_epochs,
     eff_hidden,
     eff_seeds,
@@ -705,6 +724,7 @@ def _(
                 "momentum": 0.9,
                 "nesterov": True,
                 "log_identity": bool(_log_identity),
+                "detach": bool(eff_detach),
                 "smoke": smoke_test,
             },
             "device": {"type": device.type, "name": device_name},
@@ -733,7 +753,12 @@ def _(eff_out, fig2, mo):
             if not _path.is_absolute() and _loc is not None:
                 _path = Path(str(_loc)) / _path
         elif _loc is not None:
-            _path = Path(str(_loc)) / "public" / "data" / "mnist_fig2.json"
+            _name = (
+                "mnist_fig2.json"
+                if fig2["config"].get("detach", True)
+                else "mnist_fig2_nodetach.json"
+            )
+            _path = Path(str(_loc)) / "public" / "data" / _name
         else:
             _path = None
         if _path is None:
