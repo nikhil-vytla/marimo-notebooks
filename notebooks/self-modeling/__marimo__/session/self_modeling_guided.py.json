@@ -1,0 +1,334 @@
+{
+  "version": "1",
+  "metadata": {
+    "marimo_version": "0.25.1",
+    "script_metadata_hash": "31938ce6f1dce96eeecb02b3d1611bdf"
+  },
+  "cells": [
+    {
+      "id": "Hbol",
+      "code_hash": "c00188f6b25f0a6001de05199922537e",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "MJUe",
+      "code_hash": "82ed6853b1c0b90216f158e3928201ae",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "\n    <style>\n    :root {\n      --ink: #171717;\n      --muted: #78716c;\n      --line: #e7e5e4;\n      --paper: #fbfaf7;\n      --accent: #b45309;\n      --accent-soft: #fffbeb;\n      --blue: #1d4ed8;\n      --green: #047857;\n      --red: #b91c1c;\n    }\n    .essay-hero {\n      padding: 2.2rem 0 1.3rem;\n      border-bottom: 1px solid var(--line);\n      margin-bottom: 1.2rem;\n    }\n    .essay-kicker {\n      font: 650 0.72rem/1.2 ui-sans-serif, system-ui, sans-serif;\n      letter-spacing: 0.12em;\n      text-transform: uppercase;\n      color: var(--accent);\n    }\n    .essay-hero h1 {\n      font-family: \"Iowan Old Style\", \"Palatino Linotype\", Georgia, serif;\n      font-size: clamp(2.1rem, 4vw, 3.35rem);\n      line-height: 1.02;\n      letter-spacing: -0.02em;\n      margin: 0.5rem 0 0.8rem;\n      color: var(--ink);\n    }\n    .essay-lede {\n      font-size: 1.13rem;\n      line-height: 1.55;\n      color: #44403c;\n      max-width: 46rem;\n    }\n    .essay-meta {\n      display: flex;\n      gap: 0.75rem;\n      flex-wrap: wrap;\n      align-items: center;\n      font-size: 0.82rem;\n      color: var(--muted);\n      margin-top: 1rem;\n    }\n    .status-pill {\n      display: inline-flex;\n      align-items: center;\n      gap: 0.3rem;\n      border-radius: 999px;\n      padding: 0.18rem 0.55rem;\n      font-size: 0.76rem;\n      font-weight: 650;\n      background: #f5f5f4;\n      color: #57534e;\n    }\n    .status-pill.yes { background: #ecfdf5; color: var(--green); }\n    .status-pill.partly { background: var(--accent-soft); color: var(--accent); }\n    .status-pill.no { background: #fef2f2; color: var(--red); }\n    .essay-toc {\n      display: flex;\n      flex-wrap: wrap;\n      gap: 0.45rem 1rem;\n      padding: 0.7rem 0 0.9rem;\n      border-bottom: 1px solid var(--line);\n      margin-bottom: 1.3rem;\n      font-size: 0.84rem;\n    }\n    .essay-toc a { color: var(--muted); text-decoration: none; }\n    .essay-toc a:hover { color: var(--accent); }\n    .essay-note {\n      border-left: 3px solid var(--accent);\n      background: var(--accent-soft);\n      padding: 0.9rem 1.1rem;\n      border-radius: 0 0.5rem 0.5rem 0;\n      margin: 1.2rem 0;\n      font-size: 0.94rem;\n      line-height: 1.5;\n    }\n    .verdict-grid {\n      display: grid;\n      grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));\n      gap: 0.65rem;\n      margin: 1rem 0 1.4rem;\n    }\n    .verdict-card {\n      border: 1px solid var(--line);\n      border-radius: 0.7rem;\n      padding: 0.85rem 0.9rem;\n      background: #fff;\n    }\n    .verdict-kicker {\n      font: 650 0.7rem/1.2 ui-monospace, SFMono-Regular, monospace;\n      letter-spacing: 0.08em;\n      text-transform: uppercase;\n      color: var(--muted);\n    }\n    .verdict-number {\n      font-family: \"Iowan Old Style\", Georgia, serif;\n      font-size: 1.55rem;\n      line-height: 1.1;\n      margin: 0.35rem 0 0.2rem;\n    }\n    .verdict-card.yes .verdict-number { color: var(--green); }\n    .verdict-card.no .verdict-number { color: var(--red); }\n    .verdict-card.partly .verdict-number { color: var(--accent); }\n    .verdict-note { font-size: 0.8rem; line-height: 1.4; color: var(--muted); }\n    .matrix {\n      border: 1px solid var(--line);\n      border-radius: 0.8rem;\n      background: #fff;\n      padding: 0.9rem;\n      margin: 1rem 0 1.2rem;\n    }\n    .matrix-row {\n      display: flex;\n      gap: 0.8rem;\n      align-items: center;\n      padding: 0.45rem 0;\n    }\n    .matrix-row + .matrix-row { border-top: 1px solid #f5f5f4; }\n    .matrix-label {\n      width: 5.4rem;\n      flex: 0 0 5.4rem;\n      font: 650 0.72rem/1.2 ui-monospace, SFMono-Regular, monospace;\n      letter-spacing: 0.08em;\n      text-transform: uppercase;\n      color: var(--muted);\n    }\n    .matrix-cells { display: flex; gap: 0.4rem; flex-wrap: wrap; }\n    .matrix-cell {\n      border-radius: 0.45rem;\n      padding: 0.3rem 0.55rem;\n      font-size: 0.78rem;\n      font-weight: 650;\n      min-width: 3.4rem;\n      text-align: center;\n    }\n    .matrix-cell.yes { background: #ecfdf5; color: var(--green); }\n    .matrix-cell.partly { background: var(--accent-soft); color: var(--accent); }\n    .matrix-cell.no { background: #fef2f2; color: var(--red); }\n    .figure-caption {\n      font-size: 0.8rem;\n      line-height: 1.45;\n      color: var(--muted);\n      margin: 0.3rem 0 1rem;\n    }\n    .essay-provenance {\n      border-top: 1px solid var(--line);\n      margin-top: 2.2rem;\n      padding-top: 1rem;\n      font-size: 0.82rem;\n      line-height: 1.5;\n      color: var(--muted);\n      display: grid;\n      gap: 0.4rem;\n    }\n    .essay-provenance strong { color: var(--ink); }\n    .essay-provenance a { color: var(--blue); text-decoration: none; }\n    @media (max-width: 640px) {\n      .essay-hero { padding-top: 1.2rem; }\n      .essay-hero h1 { font-size: 2rem; }\n      .matrix-row { align-items: flex-start; }\n      .matrix-label { width: 4.6rem; flex-basis: 4.6rem; }\n    }\n    </style>\n    "
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "vblA",
+      "code_hash": "8d4744f834381f32649076ae62548364",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "bkHC",
+      "code_hash": "059e261a04e73e12dfab10dec4ad5709",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "\n    <header class=\"essay-hero\">\n      <div class=\"essay-kicker\">Visual essay \u00b7 reproduction and extension</div>\n      <h1>When does a self-predicting network get simpler?</h1>\n      <p class=\"essay-lede\">On MNIST, self-modeling narrows the classifier. On CIFAR, the ordering inverts. On IMDB, the effect disappears. A toy dial shows the scale cheat behind one failure. A slowed self-model head shows the other is a mechanism that dies before it acts.</p>\n      <div class=\"essay-meta\">\n        <span class=\"status-pill partly\">\n          v1 \u00b7 guided cut\n        </span>\n        <span>15 min</span>\n        <span>Updated 2026-10-19</span>\n        <span>Premakumar et al., 2024</span>\n      </div>\n    </header>\n    "
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "lEQa",
+      "code_hash": "1129f295d7464d98ab3390b14e2bff6d",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "\n    <nav class=\"essay-toc\">\n      <a href=\"#the-paradox\">The paradox</a>\n      <a href=\"#the-mechanism\">The mechanism</a>\n      <a href=\"#the-stop-gradient\">The stop-gradient</a>\n      <a href=\"#the-pressure\">The pressure</a>\n      <a href=\"#the-scoreboard\">The scoreboard</a>\n      <a href=\"#what-next\">What next</a>\n    </nav>\n    "
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "PKri",
+      "code_hash": "508fa871eb7473567a6cdaf03b4893ed",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "\n    <div class=\"essay-note\">\n      <strong>How to read this.</strong>\n      This is the guided cut: the argument, the mechanism, and the one\n      experiment that changes the interpretation. The\n      <a href=\"https://github.com/nikhil-vytla/marimo-notebooks/blob/main/notebooks/self-modeling/self_modeling_essay.py\">lab notebook</a>\n      has every panel, probe, and RLCT detail. Read this for the\n      argument; open the lab for the evidence.\n    </div>\n    "
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Xref",
+      "code_hash": "65504836b5d5740643da199326e36786",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"the-paradox\">The paradox</h2>\n<span class=\"paragraph\">The paper's claim is simple. Add a self-prediction term to the loss,\nand the network gets simpler: the classifier weights narrow, a formal\ncomplexity measure falls, and test accuracy barely moves.</span>\n<span class=\"paragraph\">We reproduced it on MNIST. The same recipe fails, in different\nways, on CIFAR-10 and IMDB.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "SFPL",
+      "code_hash": "8edbc5e33d68e3a8870bfe5bd26b4787",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "\n    <div class=\"verdict-grid\">\n      <div class=\"verdict-card yes\">\n        <div class=\"verdict-kicker\">MNIST \u00b7 Figure 2A</div>\n        <div class=\"verdict-number\">0.0974 \u2192 0.0812</div>\n        <div class=\"verdict-note\">\n          Narrower weights with more self-modeling. The paper's\n          effect, reproduced within 0.001.\n        </div>\n      </div>\n      <div class=\"verdict-card no\">\n        <div class=\"verdict-kicker\">CIFAR-10 \u00b7 Figure 3A</div>\n        <div class=\"verdict-number\">0.0252 \u2192 0.0292</div>\n        <div class=\"verdict-note\">\n          The ordering inverts: the baseline is the narrowest curve.\n          Accuracy still matches.\n        </div>\n      </div>\n      <div class=\"verdict-card no\">\n        <div class=\"verdict-kicker\">IMDB \u00b7 Figure 4A</div>\n        <div class=\"verdict-number\">0.232 flat</div>\n        <div class=\"verdict-note\">\n          No separation across AW, and about 9x below the paper's 2.05.\n          Accuracy matches at 85.2%.\n        </div>\n      </div>\n    </div>\n    "
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "BYtC",
+      "code_hash": "3c3bc45d47d0c77c2879ac02c2a74d98",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">One number does not explain all three. The rest of the essay is the\nsearch for what does.</span>\n<span class=\"paragraph\">Two candidates survive. First, the self-model loss can be gamed: if\nthe target moves, the cheapest way to reduce the error is to shrink\nthe thing being predicted. Second, the pressure can die before it\nacts. On IMDB the self-model gradient share falls to about 2% by\nepoch 20, while MNIST stays at 14% to 18%.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "RGSE",
+      "code_hash": "a2ed3f5c580ad48fc720f1afa7318fa4",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"the-mechanism\">The mechanism</h2>\n<span class=\"paragraph\">A hidden layer produces a cloud of activations. A classifier reads\nthe cloud. A self-model head tries to predict it from the same\nhidden layer.</span>\n<span class=\"paragraph\">The self-model term is happy when the cloud is easy to predict. The\ncheapest way to make it easy is to shrink the cloud. The classifier\nthen grows to keep the logits fixed.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Kclp",
+      "code_hash": "9a18838fde6f719c5a7e402d4fb3865b",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "emfo",
+      "code_hash": "ef30fd1dbf0f700cbca71b2493f65d1f",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<marimo-ui-element object-id='emfo-0' random-id='79d34ead-ba2f-a7df-21a2-a5d0543fcbf7'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;85715fe7aa5d48449e48930656c495dc&quot;}' data-label='null' data-model-id='&quot;85715fe7aa5d48449e48930656c495dc&quot;'></marimo-anywidget></marimo-ui-element>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Hstk",
+      "code_hash": "4502a23b23547e4dcb804112026a8c95",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">At AW = <strong>5</strong>, the detached run has hidden norm\n<strong>2.92</strong> and classifier norm\n<strong>5.07</strong>. Without the stop-gradient:\n<strong>2.30</strong> and <strong>6.88</strong>.\nThe self-model error is <strong>0.000</strong> in both\nmodes. Both solve the prediction task; only the detached run\nkeeps the representation at its natural scale.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "nWHF",
+      "code_hash": "9d928d13cd939d6bcd35cb4253452627",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"the-stop-gradient\">The stop-gradient</h2>\n<span class=\"paragraph\">The self-model target is <code>a.detach()</code>. It looks like an\nimplementation detail. It is the hinge.</span>\n<span class=\"paragraph\">Before you look: which dataset is sensitive to dropping it?</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "iLit",
+      "code_hash": "3ea913fab080474ce4fd71eacfded82c",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='iLit-0' random-id='3056a575-554e-2d77-eaa1-551ddd045844'><marimo-radio data-initial-value='null' data-label='&quot;&#92;u003cspan class=&#92;&quot;markdown prose dark:prose-invert contents&#92;&quot;&#92;u003e&#92;u003cspan class=&#92;&quot;paragraph&#92;&quot;&#92;u003eWhich dataset is sensitive to the stop-gradient?&#92;u003c/span&#92;u003e&#92;u003c/span&#92;u003e&quot;' data-options='[&quot;MNIST&quot;,&quot;CIFAR-10&quot;,&quot;Both&quot;,&quot;Neither&quot;]' data-inline='false' data-disabled='false'></marimo-radio></marimo-ui-element><marimo-ui-element object-id='iLit-1' random-id='9e81856d-42af-f314-0ae4-de06bc6ec517'><marimo-checkbox data-initial-value='false' data-label='&quot;&#92;u003cspan class=&#92;&quot;markdown prose dark:prose-invert contents&#92;&quot;&#92;u003e&#92;u003cspan class=&#92;&quot;paragraph&#92;&quot;&#92;u003eReveal the ablation&#92;u003c/span&#92;u003e&#92;u003c/span&#92;u003e&quot;' data-disabled='false'></marimo-checkbox></marimo-ui-element></div>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "ZHCJ",
+      "code_hash": "1b3cd728f3c386b2158bef694f594667",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "ROlb",
+      "code_hash": "b664dacc789d94b8bf1b4ee4731ca844",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\"><em>Reveal to see the ablation.</em></span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "qnkX",
+      "code_hash": "29b6cef684e303e23e94903b5d289bbe",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"the-pressure-has-to-persist\">The pressure has to persist</h2>\n<span class=\"paragraph\">On IMDB the MNIST effect was missing. The identity diagnostics show\nwhy: the self-model head learns a shortcut early, and the self-model\nshare of the hidden-layer gradient falls to about <strong>2%</strong> by epoch 20.\nOn MNIST the share stays at <strong>14% to 18%</strong> at epoch 50.</span>\n<span class=\"paragraph\">If that is the mechanism, slowing the head down should bring the\neffect back. We scaled the self-model rows' gradient by 0.01 and\n0.001 and re-ran IMDB at AW 0, 100, and 500.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "TqIu",
+      "code_hash": "f7d3e2487fe24184e474df184590b6bd",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Vxnm",
+      "code_hash": "4450efb5c2a7002fb96d147ee9763556",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-mime-renderer data-mime='&quot;application/vnd.vegalite.v6+json&quot;' data-data='&quot;{&#92;n  &#92;&quot;&#36;schema&#92;&quot;: &#92;&quot;https://vega.github.io/schema/vega-lite/v6.4.1.json&#92;&quot;,&#92;n  &#92;&quot;config&#92;&quot;: {&#92;n    &#92;&quot;view&#92;&quot;: {&#92;n      &#92;&quot;continuousHeight&#92;&quot;: 300,&#92;n      &#92;&quot;continuousWidth&#92;&quot;: 300&#92;n    }&#92;n  },&#92;n  &#92;&quot;data&#92;&quot;: {&#92;n    &#92;&quot;name&#92;&quot;: &#92;&quot;data-9f802556e0407f151cc5befa63ee6175&#92;&quot;&#92;n  },&#92;n  &#92;&quot;datasets&#92;&quot;: {&#92;n    &#92;&quot;data-9f802556e0407f151cc5befa63ee6175&#92;&quot;: [&#92;n      {&#92;n        &#92;&quot;acc&#92;&quot;: 0.8213199973106384,&#92;n        &#92;&quot;aw&#92;&quot;: &#92;&quot;AW=0&#92;&quot;,&#92;n        &#92;&quot;half&#92;&quot;: 0.0072477595084068785,&#92;n        &#92;&quot;hi&#92;&quot;: 0.1815053608092822,&#92;n        &#92;&quot;lo&#92;&quot;: 0.16700984179246847,&#92;n        &#92;&quot;mean&#92;&quot;: 0.17425760130087534,&#92;n        &#92;&quot;scale&#92;&quot;: &#92;&quot;\u00d71 (normal)&#92;&quot;&#92;n      },&#92;n      {&#92;n        &#92;&quot;acc&#92;&quot;: 0.821453313032786,&#92;n        &#92;&quot;aw&#92;&quot;: &#92;&quot;AW=100&#92;&quot;,&#92;n        &#92;&quot;half&#92;&quot;: 0.007210889342555884,&#92;n        &#92;&quot;hi&#92;&quot;: 0.18127386657707836,&#92;n        &#92;&quot;lo&#92;&quot;: 0.16685208789196662,&#92;n        &#92;&quot;mean&#92;&quot;: 0.1740629772345225,&#92;n        &#92;&quot;scale&#92;&quot;: &#92;&quot;\u00d71 (normal)&#92;&quot;&#92;n      },&#92;n      {&#92;n        &#92;&quot;acc&#92;&quot;: 0.821399966875712,&#92;n        &#92;&quot;aw&#92;&quot;: &#92;&quot;AW=500&#92;&quot;,&#92;n        &#92;&quot;half&#92;&quot;: 0.007243138999887168,&#92;n        &#92;&quot;hi&#92;&quot;: 0.18165670578792478,&#92;n        &#92;&quot;lo&#92;&quot;: 0.16717042778815047,&#92;n        &#92;&quot;mean&#92;&quot;: 0.17441356678803763,&#92;n        &#92;&quot;scale&#92;&quot;: &#92;&quot;\u00d71 (normal)&#92;&quot;&#92;n      },&#92;n      {&#92;n        &#92;&quot;acc&#92;&quot;: 0.8213199973106384,&#92;n        &#92;&quot;aw&#92;&quot;: &#92;&quot;AW=0&#92;&quot;,&#92;n        &#92;&quot;half&#92;&quot;: 0.0072477595084068785,&#92;n        &#92;&quot;hi&#92;&quot;: 0.1815053608092822,&#92;n        &#92;&quot;lo&#92;&quot;: 0.16700984179246847,&#92;n        &#92;&quot;mean&#92;&quot;: 0.17425760130087534,&#92;n        &#92;&quot;scale&#92;&quot;: &#92;&quot;\u00d70.01&#92;&quot;&#92;n      },&#92;n      {&#92;n        &#92;&quot;acc&#92;&quot;: 0.7977733016014099,&#92;n        &#92;&quot;aw&#92;&quot;: &#92;&quot;AW=100&#92;&quot;,&#92;n        &#92;&quot;half&#92;&quot;: 0.012048935712970218,&#92;n        &#92;&quot;hi&#92;&quot;: 0.14352322203079554,&#92;n        &#92;&quot;lo&#92;&quot;: 0.1194253506048551,&#92;n        &#92;&quot;mean&#92;&quot;: 0.13147428631782532,&#92;n        &#92;&quot;scale&#92;&quot;: &#92;&quot;\u00d70.01&#92;&quot;&#92;n      },&#92;n      {&#92;n        &#92;&quot;acc&#92;&quot;: 0.736519992351532,&#92;n        &#92;&quot;aw&#92;&quot;: &#92;&quot;AW=500&#92;&quot;,&#92;n        &#92;&quot;half&#92;&quot;: 0.0048519623741546825,&#92;n        &#92;&quot;hi&#92;&quot;: 0.1458987645770152,&#92;n        &#92;&quot;lo&#92;&quot;: 0.1361948398287058,&#92;n        &#92;&quot;mean&#92;&quot;: 0.1410468022028605,&#92;n        &#92;&quot;scale&#92;&quot;: &#92;&quot;\u00d70.01&#92;&quot;&#92;n      },&#92;n      {&#92;n        &#92;&quot;acc&#92;&quot;: 0.8213199973106384,&#92;n        &#92;&quot;aw&#92;&quot;: &#92;&quot;AW=0&#92;&quot;,&#92;n        &#92;&quot;half&#92;&quot;: 0.0072477595084068785,&#92;n        &#92;&quot;hi&#92;&quot;: 0.1815053608092822,&#92;n        &#92;&quot;lo&#92;&quot;: 0.16700984179246847,&#92;n        &#92;&quot;mean&#92;&quot;: 0.17425760130087534,&#92;n        &#92;&quot;scale&#92;&quot;: &#92;&quot;\u00d70.001&#92;&quot;&#92;n      },&#92;n      {&#92;n        &#92;&quot;acc&#92;&quot;: 0.5449066559473673,&#92;n        &#92;&quot;aw&#92;&quot;: &#92;&quot;AW=100&#92;&quot;,&#92;n        &#92;&quot;half&#92;&quot;: 0.025718324250991857,&#92;n        &#92;&quot;hi&#92;&quot;: 0.23618240939280957,&#92;n        &#92;&quot;lo&#92;&quot;: 0.18474576089082587,&#92;n        &#92;&quot;mean&#92;&quot;: 0.21046408514181772,&#92;n        &#92;&quot;scale&#92;&quot;: &#92;&quot;\u00d70.001&#92;&quot;&#92;n      },&#92;n      {&#92;n        &#92;&quot;acc&#92;&quot;: 0.5609733064969381,&#92;n        &#92;&quot;aw&#92;&quot;: &#92;&quot;AW=500&#92;&quot;,&#92;n        &#92;&quot;half&#92;&quot;: 0.013364009554991731,&#92;n        &#92;&quot;hi&#92;&quot;: 0.11069289842825096,&#92;n        &#92;&quot;lo&#92;&quot;: 0.0839648793182675,&#92;n        &#92;&quot;mean&#92;&quot;: 0.09732888887325923,&#92;n        &#92;&quot;scale&#92;&quot;: &#92;&quot;\u00d70.001&#92;&quot;&#92;n      }&#92;n    ]&#92;n  },&#92;n  &#92;&quot;height&#92;&quot;: 300,&#92;n  &#92;&quot;layer&#92;&quot;: [&#92;n    {&#92;n      &#92;&quot;encoding&#92;&quot;: {&#92;n        &#92;&quot;color&#92;&quot;: {&#92;n          &#92;&quot;field&#92;&quot;: &#92;&quot;scale&#92;&quot;,&#92;n          &#92;&quot;legend&#92;&quot;: null,&#92;n          &#92;&quot;scale&#92;&quot;: {&#92;n            &#92;&quot;domain&#92;&quot;: [&#92;n              &#92;&quot;\u00d71 (normal)&#92;&quot;,&#92;n              &#92;&quot;\u00d70.01&#92;&quot;,&#92;n              &#92;&quot;\u00d70.001&#92;&quot;&#92;n            ],&#92;n            &#92;&quot;range&#92;&quot;: [&#92;n              &#92;&quot;#111827&#92;&quot;,&#92;n              &#92;&quot;#b45309&#92;&quot;,&#92;n              &#92;&quot;#a8a29e&#92;&quot;&#92;n            ]&#92;n          },&#92;n          &#92;&quot;type&#92;&quot;: &#92;&quot;nominal&#92;&quot;&#92;n        },&#92;n        &#92;&quot;x&#92;&quot;: {&#92;n          &#92;&quot;axis&#92;&quot;: {&#92;n            &#92;&quot;labelAngle&#92;&quot;: 0&#92;n          },&#92;n          &#92;&quot;field&#92;&quot;: &#92;&quot;aw&#92;&quot;,&#92;n          &#92;&quot;sort&#92;&quot;: [&#92;n            &#92;&quot;AW=0&#92;&quot;,&#92;n            &#92;&quot;AW=100&#92;&quot;,&#92;n            &#92;&quot;AW=500&#92;&quot;&#92;n          ],&#92;n          &#92;&quot;title&#92;&quot;: null,&#92;n          &#92;&quot;type&#92;&quot;: &#92;&quot;nominal&#92;&quot;&#92;n        },&#92;n        &#92;&quot;y&#92;&quot;: {&#92;n          &#92;&quot;field&#92;&quot;: &#92;&quot;lo&#92;&quot;,&#92;n          &#92;&quot;scale&#92;&quot;: {&#92;n            &#92;&quot;zero&#92;&quot;: false&#92;n          },&#92;n          &#92;&quot;title&#92;&quot;: &#92;&quot;Classifier weight SD (epoch 100)&#92;&quot;,&#92;n          &#92;&quot;type&#92;&quot;: &#92;&quot;quantitative&#92;&quot;&#92;n        },&#92;n        &#92;&quot;y2&#92;&quot;: {&#92;n          &#92;&quot;field&#92;&quot;: &#92;&quot;hi&#92;&quot;&#92;n        }&#92;n      },&#92;n      &#92;&quot;mark&#92;&quot;: {&#92;n        &#92;&quot;opacity&#92;&quot;: 0.12,&#92;n        &#92;&quot;type&#92;&quot;: &#92;&quot;area&#92;&quot;&#92;n      }&#92;n    },&#92;n    {&#92;n      &#92;&quot;encoding&#92;&quot;: {&#92;n        &#92;&quot;color&#92;&quot;: {&#92;n          &#92;&quot;field&#92;&quot;: &#92;&quot;scale&#92;&quot;,&#92;n          &#92;&quot;legend&#92;&quot;: {&#92;n            &#92;&quot;orient&#92;&quot;: &#92;&quot;bottom&#92;&quot;,&#92;n            &#92;&quot;title&#92;&quot;: &#92;&quot;self-model LR&#92;&quot;&#92;n          },&#92;n          &#92;&quot;scale&#92;&quot;: {&#92;n            &#92;&quot;domain&#92;&quot;: [&#92;n              &#92;&quot;\u00d71 (normal)&#92;&quot;,&#92;n              &#92;&quot;\u00d70.01&#92;&quot;,&#92;n              &#92;&quot;\u00d70.001&#92;&quot;&#92;n            ],&#92;n            &#92;&quot;range&#92;&quot;: [&#92;n              &#92;&quot;#111827&#92;&quot;,&#92;n              &#92;&quot;#b45309&#92;&quot;,&#92;n              &#92;&quot;#a8a29e&#92;&quot;&#92;n            ]&#92;n          },&#92;n          &#92;&quot;type&#92;&quot;: &#92;&quot;nominal&#92;&quot;&#92;n        },&#92;n        &#92;&quot;x&#92;&quot;: {&#92;n          &#92;&quot;field&#92;&quot;: &#92;&quot;aw&#92;&quot;,&#92;n          &#92;&quot;sort&#92;&quot;: [&#92;n            &#92;&quot;AW=0&#92;&quot;,&#92;n            &#92;&quot;AW=100&#92;&quot;,&#92;n            &#92;&quot;AW=500&#92;&quot;&#92;n          ],&#92;n          &#92;&quot;type&#92;&quot;: &#92;&quot;nominal&#92;&quot;&#92;n        },&#92;n        &#92;&quot;y&#92;&quot;: {&#92;n          &#92;&quot;field&#92;&quot;: &#92;&quot;mean&#92;&quot;,&#92;n          &#92;&quot;type&#92;&quot;: &#92;&quot;quantitative&#92;&quot;&#92;n        }&#92;n      },&#92;n      &#92;&quot;mark&#92;&quot;: {&#92;n        &#92;&quot;point&#92;&quot;: true,&#92;n        &#92;&quot;strokeWidth&#92;&quot;: 2,&#92;n        &#92;&quot;type&#92;&quot;: &#92;&quot;line&#92;&quot;&#92;n      }&#92;n    }&#92;n  ],&#92;n  &#92;&quot;usermeta&#92;&quot;: {&#92;n    &#92;&quot;embedOptions&#92;&quot;: {}&#92;n  },&#92;n  &#92;&quot;width&#92;&quot;: &#92;&quot;container&#92;&quot;&#92;n}&quot;'></marimo-mime-renderer><span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">At the normal rate the three AW curves sit on top of each other. At \u00d70.01 the pressure survives and AW 100/500 separate from the baseline. At \u00d70.001 the self-model term swamps the classifier: accuracy falls to <strong>54% to 56%</strong>, so those points are not interpretable.</span></span></div>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "DnEU",
+      "code_hash": "b79f0159e99c8a5ae83bb3cca35e2f3c",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">The slowed-head control is causal evidence for the identity\nmechanism, with caveats: three seeds, 100 epochs, accuracy drops,\nand the effect is not monotone in AW. It explains our missing IMDB\neffect. It does not reproduce the paper's IMDB numbers.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "ulZA",
+      "code_hash": "c2897895c1f3ca45228d6fa77989c75b",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"the-scoreboard\">The scoreboard</h2>\n<span class=\"paragraph\">The guided cut keeps the shape of the result. The full per-panel\nnotes, the probes, and the RLCT details are in the lab notebook.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "ecfG",
+      "code_hash": "a94b3fb1debc582279eab42d07ea94d3",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<div class=\"matrix\"><div class=\"matrix-row\"><div class=\"matrix-label\">MNIST</div><div class=\"matrix-cells\"><div class=\"matrix-cell yes\">2A \u00b7 yes</div><div class=\"matrix-cell yes\">2B \u00b7 yes</div><div class=\"matrix-cell yes\">2C \u00b7 yes</div><div class=\"matrix-cell yes\">2D \u00b7 yes</div></div></div><div class=\"matrix-row\"><div class=\"matrix-label\">CIFAR</div><div class=\"matrix-cells\"><div class=\"matrix-cell no\">3A \u00b7 no</div><div class=\"matrix-cell no\">3B \u00b7 no</div><div class=\"matrix-cell yes\">3C \u00b7 yes</div></div></div><div class=\"matrix-row\"><div class=\"matrix-label\">IMDB</div><div class=\"matrix-cells\"><div class=\"matrix-cell no\">4A \u00b7 no</div><div class=\"matrix-cell no\">4B \u00b7 no</div><div class=\"matrix-cell partly\">4C \u00b7 partly</div></div></div></div>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Pvdt",
+      "code_hash": "9fb761514d50706c0cc08308bbf4dac0",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><h2 id=\"what-next\">What next</h2>\n<span class=\"paragraph\">Three experiments would change the conclusion:</span>\n<ul>\n<li><strong>The CIFAR architecture gap.</strong> The paper describes skip\n  connections from block 3 into the hidden layer. We could not map\n  that onto a standard ResNet-18, so our hidden layer sits after\n  global pooling. A faithful implementation is the next experiment.</li>\n<li><strong>More seeds for the slow-head control.</strong> Three seeds and 100\n  epochs is a sign. Ten seeds and 250 epochs is a measurement.</li>\n<li><strong>A rank diagnostic for IMDB.</strong> The hidden layer is 128 units from\n  a 64-dimensional embedding. A rank test would show whether the\n  self-model rows learn a projection, as the weight distance\n  suggests.</li>\n</ul>\n<span class=\"paragraph\">The effect is real, fragile, and conditional. That is a more useful\nresult than a clean reproduction.</span></span>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "ZBYS",
+      "code_hash": "7a2aa2404f46b82005c0a5472b269d31",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "\n    <footer class=\"essay-provenance\">\n      <div>\n        <strong>Paper.</strong>\n        <a href=\"https://arxiv.org/abs/2407.10188\">Unexpected Benefits of Self-Modeling in Neural Systems</a>\n        by Premakumar et al., 2024.\n      </div>\n      <div>\n        <strong>Evidence.</strong>\n        <a href=\"https://github.com/nikhil-vytla/marimo-notebooks/blob/main/notebooks/self-modeling/self_modeling_essay.py\">\n        The lab notebook</a> has the full reproduction, the probes,\n        and the RLCT panels.\n      </div>\n      <div>\n        <strong>Data and code.</strong>\n        <a href=\"https://github.com/nikhil-vytla/marimo-notebooks\">Repository</a>.\n        Every figure reads a saved result from <code>public/data/</code>.\n      </div>\n      <div>\n        <strong>How this was made.</strong>\n        Built with marimo. The guided cut and the lab notebook share\n        the same data contract. The compression dial reads\n        precomputed toy frames.\n      </div>\n    </footer>\n    "
+          }
+        }
+      ],
+      "console": []
+    }
+  ]
+}

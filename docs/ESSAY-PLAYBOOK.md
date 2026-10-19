@@ -37,6 +37,11 @@ The self-modeling essay follows this arc, and it generalizes.
 The null results are not an appendix. In this essay they are the second
 act, and they are why the piece is worth reading.
 
+The guided cut in
+[`self_modeling_guided.py`](../notebooks/self-modeling/self_modeling_guided.py)
+is the reference implementation of this arc. The lab notebook is the
+evidence appendix.
+
 ## Build order
 
 ### Stage 0: read for claims

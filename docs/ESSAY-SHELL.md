@@ -122,3 +122,5 @@ essays that are a single argument with a small number of interactions.
 - [docs/ESSAY-PLAYBOOK.md](ESSAY-PLAYBOOK.md) for choosing papers and
   the interaction patterns.
 - [templates/essay.py](../templates/essay.py) for the source.
+- [self_modeling_guided.py](../notebooks/self-modeling/self_modeling_guided.py)
+  for the shell filled in with a real essay.

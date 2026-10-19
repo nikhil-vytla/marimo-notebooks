@@ -48,6 +48,9 @@ def _(mo):
     (Figure 3) and IMDB (Figure 4) panels. The MNIST panels
     reproduce. The others only partly do, and the places where they
     diverge turn out to be the interesting part.
+
+    This is the lab notebook. The 15-minute guided cut is
+    [here](https://github.com/nikhil-vytla/marimo-notebooks/blob/main/notebooks/self-modeling/self_modeling_guided.py).
     """)
     return
 
