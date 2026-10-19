@@ -103,6 +103,7 @@ def _(mo):
         }
         .essay-toc a { color: var(--muted); text-decoration: none; }
         .essay-toc a:hover { color: var(--accent); }
+        .essay-note a { color: var(--blue); }
         .essay-note {
           border-left: 3px solid var(--accent);
           background: var(--accent-soft);
@@ -111,6 +112,26 @@ def _(mo):
           margin: 1.2rem 0;
           font-size: 0.94rem;
           line-height: 1.5;
+        }
+        .pullquote {
+          font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+          font-size: 1.45rem;
+          line-height: 1.28;
+          color: #292524;
+          border-left: 4px solid var(--accent);
+          padding: 0.2rem 0 0.2rem 1rem;
+          margin: 1.7rem 0 1.5rem;
+        }
+        .markdown h2 {
+          font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+          font-weight: 600;
+          letter-spacing: -0.01em;
+          margin-top: 2.3rem;
+        }
+        .markdown h3 {
+          font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+          font-weight: 600;
+          letter-spacing: -0.01em;
         }
         .verdict-grid {
           display: grid;
@@ -269,7 +290,7 @@ def _(mo):
           <a href="#the-paradox">The paradox</a>
           <a href="#the-mechanism">The mechanism</a>
           <a href="#the-stop-gradient">The stop-gradient</a>
-          <a href="#the-pressure">The pressure</a>
+          <a href="#the-pressure-has-to-persist">The pressure</a>
           <a href="#the-scoreboard">The scoreboard</a>
           <a href="#what-next">What next</a>
         </nav>
@@ -342,6 +363,18 @@ def _(mo):
         </div>
         """
     )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    <p class="figure-caption">Figure 1. Three panels, three verdicts.
+    MNIST and CIFAR numbers are the epoch-50 classifier weight SD; IMDB
+    is the weight SD at the end of training. Sources:
+    <code>mnist_detach_ablation.json</code>,
+    <code>cifar_fig3_probes.json</code>, <code>imdb_fig4.json</code>.</p>
+    """)
     return
 
 
@@ -442,6 +475,25 @@ def _(DIAL, mo):
                 border-color: #fde68a;
                 color: var(--cd-accent);
               }
+              .compression-dial .cd-actions {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                flex: 0 0 auto;
+              }
+              .compression-dial .cd-play {
+                border: 1px solid var(--cd-line);
+                background: #fff;
+                border-radius: 999px;
+                padding: 6px 11px;
+                font: 600 12px/1 ui-sans-serif, system-ui, sans-serif;
+                cursor: pointer;
+                white-space: nowrap;
+              }
+              .compression-dial .cd-play:hover {
+                border-color: #d6d3d1;
+                background: #fafaf9;
+              }
               .compression-dial .cd-svg {
                 width: 100%;
                 height: auto;
@@ -477,7 +529,10 @@ def _(DIAL, mo):
                   <div class="cd-title">Compression dial</div>
                   <div class="cd-sub">Drag the dial to add self-model pressure. The classifier has to keep the logits fixed.</div>
                 </div>
-                <button class="cd-toggle on" type="button" aria-pressed="true">detached target</button>
+                <div class="cd-actions">
+                  <button class="cd-play" type="button" aria-pressed="false">Play</button>
+                  <button class="cd-toggle on" type="button" aria-pressed="true">detached target</button>
+                </div>
               </div>
               <svg class="cd-svg" viewBox="0 0 640 470" role="img" aria-label="Hidden activations and classifier norms as the self-model weight changes"></svg>
               <div class="cd-legend">
@@ -659,7 +714,48 @@ def _(DIAL, mo):
           svg.appendChild(hit);
 
           const toggle = el.querySelector(".cd-toggle");
+          const playButton = el.querySelector(".cd-play");
           let dragging = false;
+          let playing = false;
+          let animId = null;
+
+          function stopPlayback() {
+            playing = false;
+            if (animId !== null) cancelAnimationFrame(animId);
+            animId = null;
+            playButton.textContent = "Play";
+            playButton.setAttribute("aria-pressed", "false");
+          }
+
+          function startPlayback() {
+            if (playing) {
+              stopPlayback();
+              return;
+            }
+            if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+              setAw(50);
+              return;
+            }
+            const from = Number(model.get("aw"));
+            const startAw = from >= 49 ? 0 : from;
+            const started = performance.now();
+            playing = true;
+            playButton.textContent = "Pause";
+            playButton.setAttribute("aria-pressed", "true");
+            function tick(now) {
+              const t = Math.min(1, (now - started) / 2200);
+              const eased = t < 0.5
+                ? 2 * t * t
+                : 1 - Math.pow(-2 * t + 2, 2) / 2;
+              setAw(startAw + (50 - startAw) * eased);
+              if (t < 1 && playing) {
+                animId = requestAnimationFrame(tick);
+              } else {
+                stopPlayback();
+              }
+            }
+            animId = requestAnimationFrame(tick);
+          }
 
           function frameAt(aw) {
             const mode = model.get("detach") ? "detach" : "no_detach";
@@ -725,6 +821,7 @@ def _(DIAL, mo):
           }
 
           hit.addEventListener("pointerdown", (event) => {
+            stopPlayback();
             dragging = true;
             hit.setPointerCapture(event.pointerId);
             setAw(pointerToAw(event));
@@ -738,6 +835,7 @@ def _(DIAL, mo):
           });
           hit.addEventListener("pointercancel", () => { dragging = false; });
           hit.addEventListener("keydown", (event) => {
+            stopPlayback();
             const step = 5;
             const current = Number(model.get("aw"));
             if (event.key === "ArrowLeft" || event.key === "ArrowDown") {
@@ -755,14 +853,17 @@ def _(DIAL, mo):
             }
           });
           toggle.addEventListener("click", () => {
+            stopPlayback();
             model.set("detach", !model.get("detach"));
             model.save_changes();
             update();
           });
+          playButton.addEventListener("click", startPlayback);
           model.on("change:aw", update);
           model.on("change:detach", update);
           update();
           return () => {
+            stopPlayback();
             model.off("change:aw", update);
             model.off("change:detach", update);
           };
@@ -813,6 +914,19 @@ def _(DIAL, dial, mo):
         keeps the representation at its natural scale.
         """)
     _out
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    <p class="figure-caption">Figure 2. The compression dial. The hidden
+    cloud is a 2D toy trained for each AW; the dial interpolates 11
+    precomputed frames. Both modes reach self-model error 0.000. Drag
+    the dial, press Play, or toggle the stop-gradient. Source:
+    <code>compression_dial.json</code>; generator:
+    <code>scripts/build_compression_dial.py</code>.</p>
+    """)
     return
 
 
@@ -905,6 +1019,7 @@ def _(
     alt,
     guess,
     mo,
+    pd,
     reveal,
 ):
     _df = MNIST_DETACH.copy()
@@ -946,7 +1061,70 @@ def _(
             ),
         )
     )
-    _chart = (_band + _line).properties(width="container", height=330)
+    _paper = pd.DataFrame(
+        {
+            "aw_label": _order,
+            "paper": [0.097, 0.094, 0.091, 0.088, 0.085, 0.081],
+        }
+    )
+    _paper_points = (
+        alt.Chart(_paper)
+        .mark_point(
+            shape="diamond", size=80, filled=True, stroke="white",
+            strokeWidth=1,
+        )
+        .encode(
+            x=alt.X("aw_label:N", sort=_order),
+            y=alt.Y(
+                "paper:Q",
+                scale=alt.Scale(domain=[0.078, 0.120], zero=False),
+            ),
+            tooltip=[
+                alt.Tooltip("aw_label:N", title="AW"),
+                alt.Tooltip("paper:Q", format=".3f", title="paper"),
+            ],
+        )
+    )
+    _reversal = (
+        alt.Chart(pd.DataFrame({"aw_label": ["AW=1", "AW=20"]}))
+        .mark_rule(strokeDash=[3, 3], color="#a8a29e", strokeWidth=1)
+        .encode(x=alt.X("aw_label:N", sort=_order))
+    )
+    _labels = (
+        alt.Chart(
+            pd.DataFrame(
+                {
+                    "aw_label": ["AW=5", "AW=5"],
+                    "y": [0.0882, 0.1180],
+                    "mode": ["detached target", "no detach"],
+                    "text": ["detached target", "no detach"],
+                }
+            )
+        )
+        .mark_text(align="left", dx=7, fontSize=10, fontWeight=600)
+        .encode(
+            x=alt.X("aw_label:N", sort=_order),
+            y=alt.Y("y:Q"),
+            text="text:N",
+            color=alt.Color("mode:N", scale=_scale, legend=None),
+        )
+    )
+    _line = _line.encode(
+        tooltip=[
+            alt.Tooltip("mode:N", title="mode"),
+            alt.Tooltip("aw_label:N", title="AW"),
+            alt.Tooltip("mean:Q", format=".4f", title="SD"),
+            alt.Tooltip("half:Q", format=".4f", title="95% CI"),
+            alt.Tooltip("acc:Q", format=".3f", title="accuracy"),
+        ]
+    )
+    _chart = (
+        _band
+        + _reversal
+        + _paper_points
+        + _line
+        + _labels
+    ).properties(width="container", height=360)
 
     def _probe(_variant, _aw):
         _row = CIFAR_PROBES[
@@ -955,20 +1133,88 @@ def _(
         ].iloc[0]
         return float(_row["sd_e50"]), float(_row["hidden"]), float(_row["wnorm"])
 
-    _b0, _, _ = _probe("base", 0.0)
+    _b0, _, _b0w = _probe("base", 0.0)
     _b2, _b2h, _b2w = _probe("base", 2.0)
     _n0, _, _ = _probe("nodetach", 0.0)
     _n2, _n2h, _n2w = _probe("nodetach", 2.0)
-    _cifar = "\n".join(
+    _ratio0 = _b0 / _b0w
+    _ratio2 = _b2 / _b2w
+    _sd_pct = (_n2 - _b2) / _b2 * 100.0
+    _hn_pct = (_n2h - _b2h) / _b2h * 100.0
+    _wn_pct = (_n2w - _b2w) / _b2w * 100.0
+    _cifar_df = pd.DataFrame(
         [
-            (
-                "| CIFAR variant | SD (AW 0) | SD (AW 2) "
-                "| hidden \\|a\\| (AW 2) | classifier \\|W\\| (AW 2) |"
-            ),
-            "| --- | ---: | ---: | ---: | ---: |",
-            f"| base | {_b0:.4f} | {_b2:.4f} | {_b2h:.3f} | {_b2w:.2f} |",
-            f"| no detach | {_n0:.4f} | {_n2:.4f} | {_n2h:.3f} | {_n2w:.2f} |",
+            {
+                "metric": "SD",
+                "change": _sd_pct,
+                "base": _b2,
+                "nodetach": _n2,
+            },
+            {
+                "metric": "hidden |a|",
+                "change": _hn_pct,
+                "base": _b2h,
+                "nodetach": _n2h,
+            },
+            {
+                "metric": "classifier |W|",
+                "change": _wn_pct,
+                "base": _b2w,
+                "nodetach": _n2w,
+            },
         ]
+    )
+    _cifar_bars = (
+        alt.Chart(_cifar_df)
+        .mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3)
+        .encode(
+            x=alt.X(
+                "metric:N",
+                sort=["SD", "hidden |a|", "classifier |W|"],
+                title=None,
+                axis=alt.Axis(labelAngle=0),
+            ),
+            y=alt.Y(
+                "change:Q",
+                title="change vs base at AW 2 (%)",
+                scale=alt.Scale(domain=[-22, 4]),
+            ),
+            color=alt.condition(
+                alt.datum.change < 0,
+                alt.value("#b45309"),
+                alt.value("#111827"),
+            ),
+            tooltip=[
+                alt.Tooltip("metric:N"),
+                alt.Tooltip("change:Q", format="+.1f", title="change (%)"),
+                alt.Tooltip("base:Q", format=".4f", title="base"),
+                alt.Tooltip("nodetach:Q", format=".4f", title="no detach"),
+            ],
+        )
+        .properties(width="container", height=220)
+    )
+    _cifar_zero = (
+        alt.Chart(pd.DataFrame({"y": [0]}))
+        .mark_rule(color="#d6d3d1")
+        .encode(y="y:Q")
+    )
+    _cifar_text = (
+        alt.Chart(_cifar_df)
+        .mark_text(dy=12, fontSize=11, color="#57534e")
+        .encode(
+            x=alt.X("metric:N", sort=["SD", "hidden |a|", "classifier |W|"]),
+            y=alt.Y("change:Q"),
+            text=alt.Text("change:Q", format="+.1f"),
+        )
+    )
+    _cifar_chart = _cifar_zero + _cifar_bars + _cifar_text
+    _cifar_caption = mo.md(
+        f'<p class="figure-caption">Figure 4. CIFAR-10 at AW 2. '
+        f'Dropping the stop-gradient moves the SD by {_sd_pct:+.1f}%, the '
+        f'hidden norm by {_hn_pct:+.1f}%, and the classifier norm by '
+        f'{_wn_pct:+.1f}%. The ordering survives: {_n2:.4f} vs '
+        f'{_b2:.4f}, both above {_b0:.4f} at AW 0. Two seeds, 50 epochs; '
+        f'<code>cifar_fig3_probes.json</code>.</p>'
     )
 
     if guess.value == "mnist":
@@ -982,6 +1228,13 @@ def _(
         _kind = "warn"
 
     _summary = mo.callout(mo.md(_lead), kind=_kind)
+    _fig3_caption = mo.md(
+        '<p class="figure-caption">Figure 3. MNIST at hidden 512. '
+        'Lines are 10 seeds; bands are 95% CIs. Diamonds are the '
+        'paper\'s epoch-50 values, read off Figure 2A. The dashed '
+        'guides mark AW 1 and 20, where the no-detach ordering reverses. '
+        'Source: <code>mnist_detach_ablation.json</code>.</p>'
+    )
     _prose = mo.md(f"""
     With the stop-gradient, the MNIST SD falls from **0.0974** at AW 0
     to **0.0812** at AW 50. Without it, the SD rises to **0.1156** at
@@ -1000,13 +1253,37 @@ def _(
     survives. The stop-gradient is essential to the MNIST mechanism and
     irrelevant to the CIFAR inversion.
 
+    The SD divided by the classifier norm is flat across AW:
+    **{_ratio0:.5f}** at AW 0 and **{_ratio2:.5f}** at AW 2. The
+    widening tracks the classifier's scale, not a new kind of
+    complexity.
+
     The CIFAR probe is two seeds and 50 epochs. Treat it as a sign.
     """)
     if reveal.value:
-        _out = mo.vstack([_summary, _chart, mo.md(_cifar), _prose])
+        _out = mo.vstack(
+            [
+                _summary,
+                _chart,
+                _fig3_caption,
+                _cifar_chart,
+                _cifar_caption,
+                _prose,
+            ]
+        )
     else:
         _out = mo.md("_Reveal to see the ablation._")
     _out
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.Html(
+        '<blockquote class="pullquote">The stop-gradient is essential '
+        'to the MNIST mechanism and irrelevant to the CIFAR inversion. '
+        'Both can be true.</blockquote>'
+    )
     return
 
 
@@ -1062,7 +1339,7 @@ def _(json, mo, pd):
 
 
 @app.cell(hide_code=True)
-def _(SLOWHEAD, alt, mo):
+def _(SLOWHEAD, alt, mo, pd):
     _order = ["AW=0", "AW=100", "AW=500"]
     _scale = alt.Scale(
         domain=["×1 (normal)", "×0.01", "×0.001"],
@@ -1098,17 +1375,67 @@ def _(SLOWHEAD, alt, mo):
                 scale=_scale,
                 legend=alt.Legend(title="self-model LR", orient="bottom"),
             ),
+            tooltip=[
+                alt.Tooltip("scale:N", title="scale"),
+                alt.Tooltip("aw:N", title="AW"),
+                alt.Tooltip("mean:Q", format=".4f", title="SD"),
+                alt.Tooltip("half:Q", format=".4f", title="95% CI"),
+                alt.Tooltip("acc:Q", format=".3f", title="accuracy"),
+            ],
         )
     )
-    _chart = (_band + _line).properties(width="container", height=300)
-    _caption = mo.md(
-        "At the normal rate the three AW curves sit on top of each "
-        "other. At ×0.01 the pressure survives and AW 100/500 separate "
-        "from the baseline. At ×0.001 the self-model term swamps the "
-        "classifier: accuracy falls to **54% to 56%**, so those points "
-        "are not interpretable."
+    _sd = (_band + _line).properties(width="container", height=220)
+
+    _acc = (
+        alt.Chart(SLOWHEAD)
+        .mark_line(point=True, strokeWidth=2)
+        .encode(
+            x=alt.X(
+                "aw:N",
+                sort=_order,
+                title=None,
+                axis=alt.Axis(labelAngle=0),
+            ),
+            y=alt.Y(
+                "acc:Q",
+                title="Test accuracy",
+                scale=alt.Scale(domain=[0.5, 0.85]),
+            ),
+            color=alt.Color("scale:N", scale=_scale, legend=None),
+            tooltip=[
+                alt.Tooltip("scale:N", title="scale"),
+                alt.Tooltip("aw:N", title="AW"),
+                alt.Tooltip("acc:Q", format=".3f", title="accuracy"),
+            ],
+        )
     )
-    mo.vstack([_chart, _caption])
+    _chance = (
+        alt.Chart(pd.DataFrame({"y": [0.5]}))
+        .mark_rule(strokeDash=[4, 4], color="#a8a29e")
+        .encode(y="y:Q")
+    )
+    _chance_text = (
+        alt.Chart(pd.DataFrame({"aw": ["AW=0"], "y": [0.515], "text": ["chance"]}))
+        .mark_text(align="left", dx=4, fontSize=10, color="#a8a29e")
+        .encode(
+            x=alt.X("aw:N", sort=_order),
+            y=alt.Y("y:Q"),
+            text="text:N",
+        )
+    )
+    _acc = (_chance + _acc + _chance_text).properties(
+        width="container", height=170
+    )
+    _caption = mo.md(
+        '<p class="figure-caption">Figure 5. IMDB at 3 seeds and 100 '
+        'epochs. The top panel is the classifier weight SD; the bottom '
+        'panel is accuracy, with the 50% chance line. At ×1 the three '
+        'AW curves coincide. At ×0.01 the pressure survives and AW '
+        '100/500 separate from baseline. At ×0.001 accuracy is near '
+        'chance, so the SD is not interpretable. Source: '
+        '<code>slowhead_control.json</code>.</p>'
+    )
+    mo.vstack([_sd, _acc, _caption])
     return
 
 
@@ -1119,6 +1446,18 @@ def _(mo):
     mechanism, with caveats: three seeds, 100 epochs, accuracy drops,
     and the effect is not monotone in AW. It explains our missing IMDB
     effect. It does not reproduce the paper's IMDB numbers.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Two failures, two mechanisms. CIFAR's inversion is a units problem:
+    the activations shrink, and the classifier grows to keep the logits
+    fixed. IMDB's null is a timing problem: the self-model pressure dies
+    before it can act. Neither is a reason to reject the paper's claim.
+    Both are reasons to say where it holds.
     """)
     return
 
@@ -1158,6 +1497,19 @@ def _(SCORE, mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
+    <p class="figure-caption">Table 1. Replication matrix.
+    <strong>Yes</strong> means the paper's ordering and scale are within
+    our interval; <strong>No</strong> means the ordering is inverted or
+    the effect is missing; <strong>Partly</strong> means accuracy matches
+    but the effect does not. Full notes and probes are in the lab
+    notebook.</p>
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     ## What next
 
     Three experiments would change the conclusion:
@@ -1175,6 +1527,9 @@ def _(mo):
 
     The effect is real, fragile, and conditional. That is a more useful
     result than a clean reproduction.
+
+    *A reproduction that only reports the panels it matches would have
+    missed both mechanisms.*
     """)
     return
 
