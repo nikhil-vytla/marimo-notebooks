@@ -2634,157 +2634,298 @@ def _(json, mo):
 @app.cell
 def _(mo):
     mo.md(r"""
-    ## Exercise: forget the `.detach()`
+    ## The stop-gradient: essential here, irrelevant there
 
-    The stop-gradient is one line, and easy to omit. Without it the
-    target is no longer a target: the squared error also pulls on the
-    activations it is supposed to predict. The cheapest way to reduce
-    the error can then be to move the target, not to predict it.
+    The stop-gradient looks like an implementation detail. It is not.
+    The same ablation does almost nothing on CIFAR and reverses the
+    main MNIST effect.
 
-    The CIFAR probe above already contains the answer, so predict
-    before you scroll back.
-
-    At AW = 2 on CIFAR-10, dropping `.detach()` will make the
-    classifier weight SD...
+    Before you see the numbers: on which dataset does dropping
+    `.detach()` change the result?
     """)
     return
+
+
+@app.cell
+def _(json, mo, pd):
+    _ablation = json.loads(
+        (
+            mo.notebook_location()
+            / "public"
+            / "data"
+            / "mnist_detach_ablation.json"
+        ).read_text()
+    )
+    _rows = []
+    for _key, _label in (
+        ("detach", "detached target"),
+        ("no_detach", "no detach"),
+    ):
+        for _aw, _value in _ablation[_key].items():
+            _rows.append(
+                {
+                    "mode": _label,
+                    "aw": float(_aw),
+                    "mean": float(_value["sd_mean"]),
+                    "half": float(_value["sd_ci"]),
+                    "acc": float(_value["acc_mean"]),
+                }
+            )
+    MNIST_DETACH = pd.DataFrame(_rows)
+    MNIST_DETACH["lo"] = MNIST_DETACH["mean"] - MNIST_DETACH["half"]
+    MNIST_DETACH["hi"] = MNIST_DETACH["mean"] + MNIST_DETACH["half"]
+    return (MNIST_DETACH,)
 
 
 @app.cell
 def _(mo):
     detach_guess = mo.ui.radio(
         options={
-            "flip: no-detach becomes the widest curve": "flip",
-            "survive: same ordering, small change in level": "survive",
-            "nothing: the two curves are identical": "nothing",
+            "MNIST": "mnist",
+            "CIFAR-10": "cifar",
+            "Both": "both",
+            "Neither": "neither",
         },
-        label="Your prediction",
+        label="Which dataset is sensitive to the stop-gradient?",
     )
-    detach_reveal = mo.ui.checkbox(label="Reveal the probe")
+    detach_reveal = mo.ui.checkbox(label="Reveal the ablation")
     mo.vstack([detach_guess, detach_reveal])
     return detach_guess, detach_reveal
 
 
 @app.cell
-def _(CIFAR_PROBES, alt, detach_guess, detach_reveal, mo, pd):
-    _rows = []
-    for _variant, _label in (
-        ("base", "base (detached target)"),
-        ("nodetach", "no detach"),
-    ):
-        for _aw in (0.0, 2.0):
-            _row = CIFAR_PROBES[
-                (CIFAR_PROBES["variant"] == _variant)
-                & (CIFAR_PROBES["aw"] == _aw)
-            ].iloc[0]
-            _rows.append(
-                {
-                    "variant": _label,
-                    "aw": f"AW={_aw:g}",
-                    "sd": float(_row["sd_e50"]),
-                    "hidden": float(_row["hidden"][1]),
-                    "wnorm": float(_row["cls_wnorm"][1]),
-                }
-            )
-    _df = pd.DataFrame(_rows)
-
-    _chart = (
+def _(CIFAR_PROBES, MNIST_DETACH, alt, detach_guess, detach_reveal, mo):
+    _df = MNIST_DETACH.copy()
+    _order = [f"AW={aw:g}" for aw in (0, 1, 5, 10, 20, 50)]
+    _df["aw_label"] = _df["aw"].map(lambda _aw: f"AW={_aw:g}")
+    _scale = alt.Scale(
+        domain=["detached target", "no detach"],
+        range=["#111827", "#b45309"],
+    )
+    _band = (
         alt.Chart(_df)
-        .mark_line(point=True, strokeWidth=2)
+        .mark_area(opacity=0.15)
         .encode(
             x=alt.X(
-                "aw:N",
+                "aw_label:N",
+                sort=_order,
                 title=None,
                 axis=alt.Axis(labelAngle=0),
             ),
             y=alt.Y(
-                "sd:Q",
+                "lo:Q",
                 title="Classifier weight SD (epoch 50)",
                 scale=alt.Scale(zero=False),
             ),
+            y2="hi:Q",
+            color=alt.Color("mode:N", scale=_scale, legend=None),
+        )
+    )
+    _line = (
+        alt.Chart(_df)
+        .mark_line(point=True, strokeWidth=2)
+        .encode(
+            x=alt.X("aw_label:N", sort=_order),
+            y=alt.Y("mean:Q"),
             color=alt.Color(
-                "variant:N",
-                scale=alt.Scale(
-                    domain=["base (detached target)", "no detach"],
-                    range=["#111827", "#b45309"],
-                ),
+                "mode:N",
+                scale=_scale,
                 legend=alt.Legend(title=None, orient="bottom"),
             ),
             tooltip=[
-                alt.Tooltip("variant:N"),
-                alt.Tooltip("aw:N"),
-                alt.Tooltip("sd:Q", format=".4f"),
+                alt.Tooltip("mode:N"),
+                alt.Tooltip("aw_label:N", title="AW"),
+                alt.Tooltip("mean:Q", format=".4f"),
+                alt.Tooltip("half:Q", format=".4f"),
+                alt.Tooltip("acc:Q", format=".3f", title="accuracy"),
             ],
         )
-        .properties(width=520, height=260)
+    )
+    _chart = (_band + _line).properties(width=620, height=340)
+
+    def _probe(_variant, _aw):
+        _row = CIFAR_PROBES[
+            (CIFAR_PROBES["variant"] == _variant)
+            & (CIFAR_PROBES["aw"] == _aw)
+        ].iloc[0]
+        return (
+            float(_row["sd_e50"]),
+            float(_row["hidden"][1]),
+            float(_row["cls_wnorm"][1]),
+        )
+
+    _b0, _, _ = _probe("base", 0.0)
+    _b2, _b2h, _b2w = _probe("base", 2.0)
+    _n0, _, _ = _probe("nodetach", 0.0)
+    _n2, _n2h, _n2w = _probe("nodetach", 2.0)
+    _cifar_table = "\n".join(
+        [
+            (
+                "| CIFAR variant | SD (AW 0) | SD (AW 2) "
+                "| hidden \\|a\\| (AW 2) | classifier \\|W\\| (AW 2) |"
+            ),
+            "| --- | ---: | ---: | ---: | ---: |",
+            f"| base | {_b0:.4f} | {_b2:.4f} | {_b2h:.3f} | {_b2w:.2f} |",
+            f"| no detach | {_n0:.4f} | {_n2:.4f} | {_n2h:.3f} | {_n2w:.2f} |",
+        ]
     )
 
-    def _value(_variant, _aw):
-        _mask = (_df["variant"] == _variant) & (
-            _df["aw"] == f"AW={_aw:g}"
-        )
-        return _df[_mask].iloc[0]
-
-    _base = "base (detached target)"
-    _none = "no detach"
-    _b0 = float(_value(_base, 0.0)["sd"])
-    _b2 = float(_value(_base, 2.0)["sd"])
-    _n0 = float(_value(_none, 0.0)["sd"])
-    _n2 = float(_value(_none, 2.0)["sd"])
-    _h2 = float(_value(_base, 2.0)["hidden"])
-    _hn2 = float(_value(_none, 2.0)["hidden"])
-    _w2 = float(_value(_base, 2.0)["wnorm"])
-    _wn2 = float(_value(_none, 2.0)["wnorm"])
-    _pct = (_n2 - _b2) / _b2 * 100.0
-
-    if detach_guess.value is None:
-        _lead = "You did not pick an answer."
-        _kind = "neutral"
-    elif detach_guess.value == "survive":
-        _lead = "Right."
+    if detach_guess.value == "mnist":
+        _lead = "Right. MNIST is the sensitive one."
         _kind = "success"
+    elif detach_guess.value is None:
+        _lead = "Pick an answer above, then reveal."
+        _kind = "neutral"
     else:
-        _lead = "Not quite."
+        _lead = "Not quite. MNIST is the sensitive one."
         _kind = "warn"
 
-    _summary = mo.callout(
-        mo.md(
-            f"{_lead} At AW = 2, the classifier weight SD goes from "
-            f"**{_b2:.4f}** with the detached target to "
-            f"**{_n2:.4f}** without it ({_pct:+.1f}%). The AW = 0 "
-            f"values are {_b0:.4f} and {_n0:.4f}. The ordering "
-            f"survives either way."
-        ),
-        kind=_kind,
-    )
-
+    _summary = mo.callout(mo.md(_lead), kind=_kind)
     _prose = mo.md(f"""
-    The SD moves by only {abs(_pct):.1f}%, but the hidden activations
-    do more: their mean absolute value falls from {_h2:.3f} to
-    {_hn2:.3f}, and the classifier weight norm from {_w2:.2f} to
-    {_wn2:.2f}. Without the stop-gradient, the network can shrink
-    what it is asked to predict and let the classifier compensate.
-    That is the scale trade-off: smaller activations force larger
-    weights to keep the logits fixed. On this architecture it is too
-    small to flip the CIFAR ordering.
+    The MNIST chart is the new ablation: 10 seeds, hidden 512, 50
+    epochs, same batch and schedule as Figure 2A. With the
+    stop-gradient, the SD falls from **0.0974** at AW 0 to
+    **0.0812** at AW 50. Without it, the SD rises to **0.1156** at
+    AW 5 and stays above baseline through AW 20. At AW 50 it falls
+    back near the detached curve, but accuracy is **91.5%** instead of
+    **95.6%**. The paper's main effect reverses for most of the range.
 
-    The chart's y-axis is zoomed; the gap at AW = 2 is
-    {abs(_n2 - _b2):.4f}.
+    The mechanism is the scale cheat. Without the stop-gradient, the
+    self-model loss can be reduced by moving the target: shrink or
+    rearrange the activations, then let the classifier grow to keep
+    the logits fixed. The self-model head is no longer predicting a
+    fixed target; it is co-adapting with the thing it is supposed to
+    predict.
 
-    So two things are true at once. The stop-gradient is the right
-    implementation of the paper's loss: without it, the target moves.
-    And on CIFAR it is not the explanation for our disagreement with
-    the paper. An ablation can be conceptually important and still
-    leave the gap you are chasing untouched.
+    CIFAR is the counterexample. At AW 2, dropping detach changes the
+    SD from **{_b2:.4f}** to **{_n2:.4f}** and the hidden activation
+    magnitude from **{_b2h:.3f}** to **{_n2h:.3f}**, but the AW
+    ordering survives. On this architecture, the stop-gradient is not
+    the missing piece.
 
-    Two seeds and 50 epochs: treat this as a sign, not a final answer.
+    Both facts matter: detach is essential for the mechanism on MNIST,
+    and it is not the explanation for the CIFAR inversion. An ablation
+    can be decisive on one dataset and irrelevant to the gap on
+    another.
     """)
     if detach_reveal.value:
-        _out = mo.vstack([_summary, _chart, _prose])
+        _out = mo.vstack(
+            [_summary, _chart, mo.md(_cifar_table), _prose]
+        )
     else:
         _out = mo.md(
-            "Pick an answer above, then tick **Reveal the probe**."
+            "Pick an answer above, then tick **Reveal the ablation**."
         )
+    _out
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""
+    ### What the distribution does
+
+    The SD is a summary. The histogram shows what changes underneath
+    it. Use the dropdown to compare AW = 0, 5, and 20 at epoch 50.
+    """)
+    return
+
+
+@app.cell
+def _(mo):
+    hist_aw = mo.ui.dropdown(
+        options={
+            "AW = 0": "0",
+            "AW = 5": "5",
+            "AW = 20": "20",
+        },
+        value="AW = 5",
+        label="Self-model weight",
+    )
+    hist_aw
+    return (hist_aw,)
+
+
+@app.cell
+def _(alt, detach_reveal, hist_aw, json, mo, np, pd):
+    _out = mo.md("_Reveal the ablation to see the weight distributions._")
+    if detach_reveal.value:
+        _hist = json.loads(
+            (
+                mo.notebook_location()
+                / "public"
+                / "data"
+                / "mnist_detach_hist.json"
+            ).read_text()
+        )
+        _edges = np.linspace(
+            _hist["bin_range"][0],
+            _hist["bin_range"][1],
+            _hist["bins"] + 1,
+        )
+        _centers = (_edges[:-1] + _edges[1:]) / 2
+        _rows = []
+        for _mode, _label in (
+            ("detach", "detached target"),
+            ("no_detach", "no detach"),
+        ):
+            for _x, _count in zip(_centers, _hist[_mode][hist_aw.value]):
+                _rows.append(
+                    {
+                        "mode": _label,
+                        "bin": float(_x),
+                        "count": float(_count),
+                    }
+                )
+        _df = pd.DataFrame(_rows)
+        _scale = alt.Scale(
+            domain=["detached target", "no detach"],
+            range=["#111827", "#b45309"],
+        )
+        _area = (
+            alt.Chart(_df)
+            .mark_area(interpolate="step", opacity=0.35)
+            .encode(
+                x=alt.X(
+                    "bin:Q",
+                    title="Classifier weight",
+                    scale=alt.Scale(domain=[-1, 1]),
+                ),
+                y=alt.Y("count:Q", title="Mean count per bin"),
+                color=alt.Color(
+                    "mode:N",
+                    scale=_scale,
+                    legend=alt.Legend(title=None, orient="bottom"),
+                ),
+            )
+        )
+        _line = (
+            alt.Chart(_df)
+            .mark_line(interpolate="step", strokeWidth=1.4)
+            .encode(
+                x=alt.X("bin:Q"),
+                y=alt.Y("count:Q"),
+                color=alt.Color("mode:N", scale=_scale, legend=None),
+            )
+        )
+        _zero = (
+            alt.Chart(pd.DataFrame({"x": [0.0]}))
+            .mark_rule(color="#9ca3af", strokeDash=[4, 4])
+            .encode(x="x:Q")
+        )
+        _chart = (_area + _line + _zero).properties(
+            width=620, height=260
+        )
+        _o = _hist["outlier_fraction_abs_gt_0_6"][hist_aw.value]
+        _caption = mo.md(
+            f"At AW = {hist_aw.value}, **{_o['no_detach']:.2%}** of "
+            f"the no-detach weights sit beyond ±0.6, versus "
+            f"**{_o['detach']:.2%}** with the stop-gradient. The "
+            f"no-detach distribution is not uniformly wider: it keeps "
+            f"a sharp central peak and grows heavier tails. A few "
+            f"weights run, and they are enough to raise the SD."
+        )
+        _out = mo.vstack([_chart, _caption])
     _out
     return
 

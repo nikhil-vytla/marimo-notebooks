@@ -168,6 +168,14 @@ A dropdown of variants, the same metric and axis for each, and the
 result table. The empty result is a result. The CIFAR probe table is
 this pattern.
 
+### Contrast two datasets
+
+Run the same ablation on the dataset where the effect is real and the
+one where it is not. The contrast is the argument. In the self-modeling
+essay, dropping the stop-gradient reverses the MNIST effect and barely
+moves CIFAR. That pair is more convincing than either result alone, and
+it keeps the reader from overgeneralizing.
+
 ### What would change my mind
 
 A short list, not a caveat paragraph. Make each item concrete enough
@@ -352,6 +360,9 @@ project than a first pass. Say so early.
   what to trust before the complications.
 - Treat a null result as a first-class finding. The CIFAR and IMDB
   sections are why the essay is interesting.
+- Run every key ablation on both the positive and negative dataset. The
+  stop-gradient looked like a detail until it reversed MNIST and did
+  nothing to CIFAR.
 - Keep the essay and training notebooks separate from day one.
 - Use `just` and CI before the second notebook. It makes agent work
   reviewable.
