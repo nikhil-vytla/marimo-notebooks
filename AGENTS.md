@@ -10,14 +10,17 @@ notebooks/<kebab-slug>/
   <snake_slug>.py        # entry notebook, self-contained
   public/                # data and assets the notebook reads
 templates/notebook.py    # start every new notebook here
-justfile                 # check, smoke, edit, new, list
+templates/essay.py       # start every new visual essay here
+docs/ESSAY-PLAYBOOK.md   # choosing papers, interaction patterns
+docs/ESSAY-SHELL.md      # how to use the essay template
+justfile                 # check, smoke, edit, new, new-essay, list
 ```
 
 One topic per folder under `notebooks/`. Name the entry notebook after its folder (`bayes-theorem/` -> `bayes_theorem.py`); add more descriptively named notebooks when a topic needs several.
 
 ## Add a notebook
 
-1. Run `just new <kebab-slug>` to scaffold `notebooks/<slug>/` from `templates/notebook.py`.
+1. Run `just new <kebab-slug>` to scaffold `notebooks/<slug>/` from `templates/notebook.py`, or `just new-essay <kebab-slug>` for a visual essay from `templates/essay.py`.
 2. Add a PEP 723 `# /// script` header listing every import, including `marimo`, with exact `==` versions.
 3. Write the notebook source.
 4. Fill in the folder `README.md` and add a root `README.md` table row.
@@ -62,4 +65,4 @@ A notebook change is done when all hold:
 
 ## Method
 
-For paper selection, essay structure, interaction patterns, and the marimo capability ladder, see [`docs/ESSAY-PLAYBOOK.md`](docs/ESSAY-PLAYBOOK.md).
+For paper selection, essay structure, interaction patterns, and the marimo capability ladder, see [`docs/ESSAY-PLAYBOOK.md`](docs/ESSAY-PLAYBOOK.md). For the reusable essay frame, see [`docs/ESSAY-SHELL.md`](docs/ESSAY-SHELL.md) and [`templates/essay.py`](templates/essay.py).

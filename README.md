@@ -9,8 +9,8 @@ Keeping track of various interactive notebooks I'm building!
 
 ## Working on this repo
 
-See [AGENTS.md](AGENTS.md) for layout and conventions. Use `just` for everything: `just list`, `just new <slug>`, `just edit <path>`, `just check`, `just smoke <path>`.
+See [AGENTS.md](AGENTS.md) for layout and conventions. Use `just` for everything: `just list`, `just new <slug>`, `just new-essay <slug>`, `just edit <path>`, `just check`, `just smoke <path>`.
 
 ## Method
 
-See [docs/ESSAY-PLAYBOOK.md](docs/ESSAY-PLAYBOOK.md) for choosing papers, the data contract, interaction patterns, the marimo capability ladder, and what to do next.
+See [docs/ESSAY-PLAYBOOK.md](docs/ESSAY-PLAYBOOK.md) for choosing papers, the data contract, interaction patterns, the marimo capability ladder, and what to do next. See [docs/ESSAY-SHELL.md](docs/ESSAY-SHELL.md) for the reusable essay frame in [templates/essay.py](templates/essay.py).
