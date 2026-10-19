@@ -271,7 +271,7 @@ def _():
         "authors": "Premakumar et al., 2024",
         "status": "v1 · guided cut",
         "status_class": "partly",
-        "reading_time": "15 min",
+        "reading_time": "17 min",
         "updated": "2026-10-19",
         "repo": "https://github.com/nikhil-vytla/marimo-notebooks",
     }
@@ -320,6 +320,7 @@ def _(mo):
           <a href="#the-paradox">The paradox</a>
           <a href="#the-mechanism">The mechanism</a>
           <a href="#the-stop-gradient">The stop-gradient</a>
+          <a href="#the-skip-test">The skip test</a>
           <a href="#the-pressure-has-to-persist">The pressure</a>
           <a href="#the-scoreboard">The scoreboard</a>
           <a href="#what-next">What next</a>
@@ -1309,6 +1310,144 @@ def _(
 
 @app.cell(hide_code=True)
 def _(mo):
+    mo.md(r"""
+    ## The skip test
+
+    Our first CIFAR run used a standard ResNet-18. The paper says the
+    input to the hidden layer includes the output of block 4 and the
+    skip connections from block 3. That is the largest architectural
+    difference between our run and the paper's.
+
+    We implemented the simplest faithful version: global-pool block 3
+    and block 4, concatenate the 256- and 512-vectors, and feed the
+    768-vector into the 2000-wide hidden layer. The self-model target is
+    the concatenation of that input and the hidden activations.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(json, mo, pd):
+    _skip = json.loads(
+        (
+            mo.notebook_location()
+            / "public"
+            / "data"
+            / "cifar_skip.json"
+        ).read_text()
+    )
+    _labels = {
+        "none": "standard ResNet-18",
+        "block3": "block-3 skip",
+    }
+    _rows = []
+    for _value in _skip["results"].values():
+        _rows.append(
+            {
+                "mode": _labels[_value["skip"]],
+                "aw": f"AW={_value['aw']:g}",
+                "mean": float(_value["sd_mean"]),
+                "half": float(_value["sd_ci"]),
+                "acc": float(_value["acc_mean"]),
+            }
+        )
+    CIFAR_SKIP = pd.DataFrame(_rows)
+    CIFAR_SKIP["lo"] = CIFAR_SKIP["mean"] - CIFAR_SKIP["half"]
+    CIFAR_SKIP["hi"] = CIFAR_SKIP["mean"] + CIFAR_SKIP["half"]
+    return (CIFAR_SKIP,)
+
+
+@app.cell(hide_code=True)
+def _(CIFAR_SKIP, alt, mo):
+    _order = ["AW=0", "AW=2"]
+    _scale = alt.Scale(
+        domain=["standard ResNet-18", "block-3 skip"],
+        range=["#111827", "#b45309"],
+    )
+    _band = (
+        alt.Chart(CIFAR_SKIP)
+        .mark_area(opacity=0.15)
+        .encode(
+            x=alt.X(
+                "aw:N",
+                sort=_order,
+                title=None,
+                axis=alt.Axis(labelAngle=0),
+            ),
+            y=alt.Y(
+                "lo:Q",
+                title="Classifier weight SD (epoch 150)",
+                scale=alt.Scale(zero=False),
+            ),
+            y2="hi:Q",
+            color=alt.Color("mode:N", scale=_scale, legend=None),
+        )
+    )
+    _line = (
+        alt.Chart(CIFAR_SKIP)
+        .mark_line(point=True, strokeWidth=2)
+        .encode(
+            x=alt.X("aw:N", sort=_order),
+            y=alt.Y("mean:Q"),
+            color=alt.Color(
+                "mode:N",
+                scale=_scale,
+                legend=alt.Legend(title=None, orient="bottom"),
+            ),
+            tooltip=[
+                alt.Tooltip("mode:N", title="model"),
+                alt.Tooltip("aw:N", title="AW"),
+                alt.Tooltip("mean:Q", format=".4f", title="SD"),
+                alt.Tooltip("half:Q", format=".4f", title="95% CI"),
+                alt.Tooltip("acc:Q", format=".3f", title="accuracy"),
+            ],
+        )
+    )
+    _labels = (
+        alt.Chart(CIFAR_SKIP[CIFAR_SKIP["aw"] == "AW=2"])
+        .mark_text(align="right", dx=-8, fontSize=10, fontWeight=600)
+        .encode(
+            x=alt.X("aw:N", sort=_order),
+            y=alt.Y("mean:Q"),
+            text="mode:N",
+            color=alt.Color("mode:N", scale=_scale, legend=None),
+        )
+    )
+    _chart = (_band + _line + _labels).properties(
+        width="container", height=280
+    )
+    _caption = mo.md(
+        '<p class="figure-caption">Figure 5. The block-3 skip lowers '
+        'the level but not the ordering. Lines are means over two seeds; '
+        'bands are 95% CIs. At 150 epochs, batch 512. The paper reports '
+        'the opposite ordering: the baseline is widest and self-modeling '
+        'narrows it. Source: <code>cifar_skip.json</code>; script: '
+        '<code>scripts/cifar_skip_experiment.py</code>.</p>'
+    )
+    mo.vstack([_chart, _caption])
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    The skip changes the level, not the ordering. At 150 epochs the
+    standard model goes from **0.0400** at AW 0 to **0.0508** at AW 2.
+    The block-3 model goes from **0.0321** to **0.0402**. The skip
+    lowers the absolute SD, but the self-modeling run is still wider.
+    The CIFAR inversion survives the obvious architectural fix.
+
+    The block-3 intervals do not overlap. The standard run's two-seed
+    intervals do, so read that arm as a sign rather than a measurement.
+    The paper uses batch 64 and does not pin down the skip placement.
+    This is a negative result for this implementation, not a proof that
+    no skip would work.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
     mo.Html(
         '<blockquote class="pullquote">The stop-gradient is essential '
         'to the MNIST mechanism and irrelevant to the CIFAR inversion. '
@@ -1457,7 +1596,7 @@ def _(SLOWHEAD, alt, mo, pd):
         width="container", height=170
     )
     _caption = mo.md(
-        '<p class="figure-caption">Figure 5. IMDB at 3 seeds and 100 '
+        '<p class="figure-caption">Figure 6. IMDB at 3 seeds and 100 '
         'epochs. The top panel is the classifier weight SD; the bottom '
         'panel is accuracy, with the 50% chance line. At ×1 the three '
         'AW curves coincide. At ×0.01 the pressure survives and AW '
@@ -1587,10 +1726,11 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    <p class="figure-caption">Figure 6. Two failures, two mechanisms.
+    <p class="figure-caption">Figure 7. Two failures, two mechanisms.
     CIFAR's inversion is a units change: the classifier norm grows with
-    the SD, so SD/|W| is flat. IMDB's null is a timing problem: the
-    self-model gradient share falls to about 2% by epoch 20. Sources:
+    the SD, so SD/|W| is flat, and the block-3 skip does not change the
+    ordering. IMDB's null is a timing problem: the self-model gradient
+    share falls to about 2% by epoch 20. Sources:
     <code>cifar_fig3_probes.json</code>,
     <code>identity_diagnostics.json</code>,
     <code>slowhead_control.json</code>.</p>
@@ -1637,7 +1777,8 @@ def _(mo):
     <strong>Yes</strong> means the paper's ordering and scale are within
     our interval; <strong>No</strong> means the ordering is inverted or
     the effect is missing; <strong>Partly</strong> means accuracy matches
-    but the effect does not. Full notes and probes are in the lab
+    but the effect does not. 3A was also tested with the block-3 skip;
+    the ordering stayed inverted. Full notes and probes are in the lab
     notebook.</p>
     """)
     return
@@ -1650,10 +1791,10 @@ def _(mo):
 
     Three experiments would change the conclusion:
 
-    - **The CIFAR architecture gap.** The paper describes skip
-      connections from block 3 into the hidden layer. We could not map
-      that onto a standard ResNet-18, so our hidden layer sits after
-      global pooling. A faithful implementation is the next experiment.
+    - **A batch-64 skip rerun.** Our skip test used batch 512 and a
+      pooled concatenation. The paper uses batch 64 and does not pin down
+      the skip placement. A spatial skip at batch 64 is the next CIFAR
+      experiment.
     - **More seeds for the slow-head control.** Three seeds and 100
       epochs is a sign. Ten seeds and 250 epochs is a measurement.
     - **A rank diagnostic for IMDB.** The hidden layer is 128 units from

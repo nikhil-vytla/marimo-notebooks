@@ -281,10 +281,10 @@ The frontier, in order of payoff:
 
 ## The self-modeling essay: next moves
 
-1. **CIFAR architecture gap.** The skip connection from block 3 into the
-   hidden layer is the biggest unresolved difference. Implement it
-   faithfully and rerun 3A and 3B. If the inversion flips, you have a
-   result. If it does not, you have a stronger negative.
+1. **CIFAR skip, batch 64.** The pooled block-3 skip did not change the
+   ordering: 0.0321 at AW 0 and 0.0402 at AW 2, with disjoint intervals.
+   The remaining differences are batch 64 and the exact skip placement.
+   A spatial skip at batch 64 is the next CIFAR experiment.
 2. **More seeds for the slow-head control.** Three seeds and 100 epochs
    is a sign. Ten seeds and 250 epochs is a measurement. Pre-register
    the read-out before running.
