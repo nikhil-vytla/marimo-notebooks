@@ -195,6 +195,36 @@ def _(mo):
         .matrix-cell.yes { background: #ecfdf5; color: var(--green); }
         .matrix-cell.partly { background: var(--accent-soft); color: var(--accent); }
         .matrix-cell.no { background: #fef2f2; color: var(--red); }
+        .mechanism-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+          gap: 0.8rem;
+          margin: 1rem 0 0.6rem;
+        }
+        .mechanism-card {
+          border: 1px solid var(--line);
+          border-radius: 0.8rem;
+          background: #fff;
+          padding: 0.9rem 0.95rem;
+        }
+        .mechanism-kicker {
+          font: 650 0.7rem/1.2 ui-monospace, SFMono-Regular, monospace;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: var(--muted);
+        }
+        .mechanism-svg {
+          width: 100%;
+          height: auto;
+          display: block;
+          margin: 0.5rem 0 0.2rem;
+        }
+        .mechanism-text {
+          font-size: 0.86rem;
+          line-height: 1.5;
+          color: #57534e;
+        }
+        .mechanism-text strong { color: var(--ink); }
         .figure-caption {
           font-size: 0.8rem;
           line-height: 1.45;
@@ -1453,11 +1483,117 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Two failures, two mechanisms. CIFAR's inversion is a units problem:
-    the activations shrink, and the classifier grows to keep the logits
-    fixed. IMDB's null is a timing problem: the self-model pressure dies
-    before it can act. Neither is a reason to reject the paper's claim.
-    Both are reasons to say where it holds.
+    Two failures, two mechanisms. The figure is the whole result in one
+    glance.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.Html(
+        """
+        <div class="mechanism-grid">
+          <div class="mechanism-card">
+            <div class="mechanism-kicker">CIFAR-10 · units</div>
+            <svg class="mechanism-svg" viewBox="0 0 280 150"
+                 role="img"
+                 aria-label="Hidden activations shrink while the classifier grows">
+              <defs>
+                <marker id="mech-arrow" viewBox="0 0 10 10" refX="9"
+                        refY="5" markerWidth="5" markerHeight="5"
+                        orient="auto">
+                  <path d="M0,0 L10,5 L0,10 z" fill="#a8a29e"/>
+                </marker>
+              </defs>
+              <text x="44" y="16" text-anchor="middle" font-size="10"
+                    fill="#78716c">AW 0</text>
+              <text x="200" y="16" text-anchor="middle" font-size="10"
+                    fill="#78716c">AW 2</text>
+              <g opacity="0.85">
+                <circle cx="30" cy="50" r="3.2" fill="#1d4ed8"/>
+                <circle cx="42" cy="46" r="3.2" fill="#1d4ed8"/>
+                <circle cx="52" cy="56" r="3.2" fill="#1d4ed8"/>
+                <circle cx="34" cy="70" r="3.2" fill="#b45309"/>
+                <circle cx="46" cy="68" r="3.2" fill="#b45309"/>
+                <circle cx="58" cy="74" r="3.2" fill="#b45309"/>
+                <circle cx="32" cy="90" r="3.2" fill="#047857"/>
+                <circle cx="44" cy="92" r="3.2" fill="#047857"/>
+                <circle cx="56" cy="88" r="3.2" fill="#047857"/>
+                <circle cx="192" cy="64" r="3.2" fill="#1d4ed8"/>
+                <circle cx="199" cy="62" r="3.2" fill="#1d4ed8"/>
+                <circle cx="206" cy="68" r="3.2" fill="#1d4ed8"/>
+                <circle cx="194" cy="76" r="3.2" fill="#b45309"/>
+                <circle cx="201" cy="74" r="3.2" fill="#b45309"/>
+                <circle cx="208" cy="80" r="3.2" fill="#b45309"/>
+                <circle cx="192" cy="88" r="3.2" fill="#047857"/>
+                <circle cx="199" cy="90" r="3.2" fill="#047857"/>
+                <circle cx="206" cy="86" r="3.2" fill="#047857"/>
+              </g>
+              <line x1="95" y1="80" x2="135" y2="80" stroke="#a8a29e"
+                    stroke-width="1.5" marker-end="url(#mech-arrow)"/>
+              <text x="115" y="70" text-anchor="middle" font-size="9"
+                    fill="#78716c">AW ↑</text>
+              <rect x="30" y="118" width="40" height="8" rx="3"
+                    fill="#b45309" opacity="0.8"/>
+              <rect x="176" y="118" width="60" height="8" rx="3"
+                    fill="#b45309" opacity="0.8"/>
+              <text x="50" y="140" text-anchor="middle" font-size="9"
+                    fill="#78716c">|W| small</text>
+              <text x="206" y="140" text-anchor="middle" font-size="9"
+                    fill="#78716c">|W| grows</text>
+            </svg>
+            <p class="mechanism-text"><strong>SD / |W| stays flat.</strong>
+            The activations shrink and the classifier grows to keep the
+            logits fixed. The wider SD is a units change, not a new
+            complexity.</p>
+          </div>
+          <div class="mechanism-card">
+            <div class="mechanism-kicker">IMDB · timing</div>
+            <svg class="mechanism-svg" viewBox="0 0 280 150"
+                 role="img"
+                 aria-label="Self-model gradient share falls to two percent by epoch twenty">
+              <line x1="28" y1="120" x2="260" y2="120" stroke="#d6d3d1"/>
+              <line x1="28" y1="120" x2="28" y2="30" stroke="#d6d3d1"/>
+              <line x1="28" y1="111" x2="260" y2="111" stroke="#d6d3d1"
+                    stroke-dasharray="4 4"/>
+              <text x="250" y="107" text-anchor="end" font-size="9"
+                    fill="#a8a29e">2%</text>
+              <polyline points="28,39 49,52 70,84 91,102 112,111 154,111 196,111 238,111"
+                        fill="none" stroke="#b45309" stroke-width="3"
+                        stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="112" cy="111" r="3.5" fill="#b45309"/>
+              <text x="120" y="96" font-size="9" fill="#78716c">pressure dies</text>
+              <text x="28" y="24" font-size="9" fill="#78716c">self-model share</text>
+              <text x="28" y="136" font-size="9" fill="#a8a29e">0</text>
+              <text x="112" y="136" text-anchor="middle" font-size="9"
+                    fill="#a8a29e">20</text>
+              <text x="196" y="136" text-anchor="middle" font-size="9"
+                    fill="#a8a29e">40</text>
+              <text x="260" y="136" text-anchor="end" font-size="9"
+                    fill="#a8a29e">epoch</text>
+            </svg>
+            <p class="mechanism-text"><strong>The pressure dies.</strong>
+            The self-model share of the hidden-layer gradient falls to
+            about 2% by epoch 20. Slow the head down and the effect comes
+            back.</p>
+          </div>
+        </div>
+        """
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    <p class="figure-caption">Figure 6. Two failures, two mechanisms.
+    CIFAR's inversion is a units change: the classifier norm grows with
+    the SD, so SD/|W| is flat. IMDB's null is a timing problem: the
+    self-model gradient share falls to about 2% by epoch 20. Sources:
+    <code>cifar_fig3_probes.json</code>,
+    <code>identity_diagnostics.json</code>,
+    <code>slowhead_control.json</code>.</p>
     """)
     return
 
