@@ -2,11 +2,15 @@
 
 The paper says the hidden layer receives "the output of the fourth
 convolutional block and the skip-connections from the third block."
-A standard ResNet-18 has no such skip. This script tests the simplest
-faithful reading: global-average-pool block 3 and block 4, concatenate
-them, and feed that 768-vector into the 2000-wide hidden layer. The
-self-model target is the concatenation of that input and the hidden
-activations.
+A standard ResNet-18 has no such skip. This script tests two readings.
+`block3` global-average-pools block 3 and block 4, concatenates them,
+and feeds that 768-vector into the 2000-wide hidden layer. `spatial`
+concatenates block 3 with an upsampled block 4, fuses them with a 1x1
+convolution to 512, then pools. The self-model target is the
+concatenation of the hidden input and the hidden activations.
+
+Both variants failed to flip the CIFAR ordering in the runs saved under
+`notebooks/self-modeling/public/data/cifar_skip.json`.
 
 Run on a CUDA machine:
 
@@ -89,11 +93,13 @@ class CifarResNet18Skip(nn.Module):
 
     def __init__(self, skip: str = "none"):
         super().__init__()
-        if skip not in ("none", "block3"):
+        if skip not in ("none", "block3", "spatial"):
             raise ValueError(f"unknown skip mode {skip!r}")
         self.skip = skip
-        self.input_width = POOLED4_WIDTH + (
-            POOLED3_WIDTH if skip == "block3" else 0
+        self.input_width = (
+            POOLED4_WIDTH + POOLED3_WIDTH
+            if skip == "block3"
+            else POOLED4_WIDTH
         )
         self.target_width = self.input_width + HIDDEN_WIDTH
         self.stem = nn.Sequential(
@@ -105,6 +111,13 @@ class CifarResNet18Skip(nn.Module):
         self.layer2 = self._make_layer(64, 128, 2, 2)
         self.layer3 = self._make_layer(128, 256, 2, 2)
         self.layer4 = self._make_layer(256, 512, 2, 2)
+        self.skip_fuse = None
+        if skip == "spatial":
+            self.skip_fuse = nn.Sequential(
+                nn.Conv2d(256 + 512, 512, 1, bias=False),
+                nn.BatchNorm2d(512),
+                nn.ReLU(inplace=True),
+            )
         self.hidden = nn.Linear(self.input_width, HIDDEN_WIDTH)
         self.out = nn.Linear(HIDDEN_WIDTH, N_CLASSES + self.target_width)
 
@@ -122,12 +135,28 @@ class CifarResNet18Skip(nn.Module):
         x = self.layer2(x)
         block3 = self.layer3(x)
         block4 = self.layer4(block3)
-        pooled4 = torch.flatten(F.adaptive_avg_pool2d(block4, 1), 1)
-        if self.skip == "block3":
-            pooled3 = torch.flatten(F.adaptive_avg_pool2d(block3, 1), 1)
-            hidden_input = torch.cat([pooled4, pooled3], dim=1)
+        if self.skip == "spatial":
+            up = F.interpolate(
+                block4,
+                size=block3.shape[-2:],
+                mode="bilinear",
+                align_corners=False,
+            )
+            fused = self.skip_fuse(torch.cat([block3, up], dim=1))
+            hidden_input = torch.flatten(
+                F.adaptive_avg_pool2d(fused, 1), 1
+            )
         else:
-            hidden_input = pooled4
+            pooled4 = torch.flatten(
+                F.adaptive_avg_pool2d(block4, 1), 1
+            )
+            if self.skip == "block3":
+                pooled3 = torch.flatten(
+                    F.adaptive_avg_pool2d(block3, 1), 1
+                )
+                hidden_input = torch.cat([pooled4, pooled3], dim=1)
+            else:
+                hidden_input = pooled4
         hidden = F.relu(self.hidden(hidden_input))
         return hidden_input, hidden
 
@@ -333,7 +362,7 @@ def main() -> None:
     modes = (
         [m.strip() for m in _modes_env.split(",") if m.strip()]
         if _modes_env
-        else ["none", "block3"]
+        else ["none", "block3", "spatial"]
     )
     out_dir = Path(os.environ.get("CIFAR_SKIP_OUT", "/marimo/public/data"))
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -418,7 +447,11 @@ def main() -> None:
             "limit": limit,
             "compile": os.environ.get("CIFAR_SKIP_COMPILE", "1") == "1",
             "amp": os.environ.get("CIFAR_SKIP_AMP", "1") == "1",
-            "skip": "none = standard ResNet-18 hidden input; block3 = concat pooled block3 and block4",
+            "skip": (
+                "none = standard ResNet-18; block3 = concat pooled block3 "
+                "and block4; spatial = concat block3 with upsampled block4, "
+                "then 1x1 conv to 512"
+            ),
             "target": "concat(hidden input, hidden activations)",
         },
         "results": results,

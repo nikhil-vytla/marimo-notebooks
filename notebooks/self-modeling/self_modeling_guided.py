@@ -1339,6 +1339,7 @@ def _(json, mo, pd):
     _labels = {
         "none": "standard ResNet-18",
         "block3": "block-3 skip",
+        "spatial": "spatial skip",
     }
     _rows = []
     for _value in _skip["results"].values():
@@ -1354,11 +1355,23 @@ def _(json, mo, pd):
     CIFAR_SKIP = pd.DataFrame(_rows)
     CIFAR_SKIP["lo"] = CIFAR_SKIP["mean"] - CIFAR_SKIP["half"]
     CIFAR_SKIP["hi"] = CIFAR_SKIP["mean"] + CIFAR_SKIP["half"]
-    return (CIFAR_SKIP,)
+
+    _b64_rows = []
+    for _value in _skip.get("batch64", {}).get("results", {}).values():
+        _b64_rows.append(
+            {
+                "mode": _labels[_value["skip"]],
+                "aw": f"AW={_value['aw']:g}",
+                "mean": float(_value["sd_mean"]),
+                "acc": float(_value["acc_mean"]),
+            }
+        )
+    CIFAR_SKIP_B64 = pd.DataFrame(_b64_rows)
+    return (CIFAR_SKIP, CIFAR_SKIP_B64)
 
 
 @app.cell(hide_code=True)
-def _(CIFAR_SKIP, alt, mo):
+def _(CIFAR_SKIP, CIFAR_SKIP_B64, alt, mo):
     _order = ["AW=0", "AW=2"]
     _scale = alt.Scale(
         domain=["standard ResNet-18", "block-3 skip"],
@@ -1421,10 +1434,33 @@ def _(CIFAR_SKIP, alt, mo):
         'the level but not the ordering. Lines are means over two seeds; '
         'bands are 95% CIs. At 150 epochs, batch 512. The paper reports '
         'the opposite ordering: the baseline is widest and self-modeling '
-        'narrows it. Source: <code>cifar_skip.json</code>; script: '
+        'narrows it. The batch-64 probe is in Table 1. Source: '
+        '<code>cifar_skip.json</code>; script: '
         '<code>scripts/cifar_skip_experiment.py</code>.</p>'
     )
-    mo.vstack([_chart, _caption])
+
+    _pivot = CIFAR_SKIP_B64.pivot(
+        index="mode", columns="aw", values="mean"
+    )
+    _acc = CIFAR_SKIP_B64.groupby("mode")["acc"].mean()
+    _lines = [
+        "| model | AW 0 | AW 2 | accuracy |",
+        "| --- | ---: | ---: | ---: |",
+    ]
+    _short = {"standard ResNet-18": "standard", "spatial skip": "spatial"}
+    for _mode in ["standard ResNet-18", "spatial skip"]:
+        _lines.append(
+            f"| {_short[_mode]} | {_pivot.loc[_mode, 'AW=0']:.4f} | "
+            f"{_pivot.loc[_mode, 'AW=2']:.4f} | "
+            f"{_acc.loc[_mode]:.3f} |"
+        )
+    _table = mo.md(
+        "**Table 1. The batch-64 probe.** One seed, 75 epochs. At the "
+        "paper's batch size the absolute SD is higher, but the ordering "
+        "is still inverted. Source: `cifar_skip.json`.\n\n"
+        + "\n".join(_lines)
+    )
+    mo.vstack([_chart, _caption, _table])
     return
 
 
@@ -1435,13 +1471,20 @@ def _(mo):
     standard model goes from **0.0400** at AW 0 to **0.0508** at AW 2.
     The block-3 model goes from **0.0321** to **0.0402**. The skip
     lowers the absolute SD, but the self-modeling run is still wider.
-    The CIFAR inversion survives the obvious architectural fix.
+
+    We also ran the paper's batch size. At batch 64 we used a spatial
+    skip: concatenate block 3 with an upsampled block 4, fuse them with
+    a 1x1 convolution to 512, then pool. At 75 epochs, the standard
+    model goes from **0.0759** to **0.1001**; the spatial skip goes from
+    **0.1050** to **0.1101**. The absolute SD is much higher, and the
+    ordering is still inverted.
 
     The block-3 intervals do not overlap. The standard run's two-seed
     intervals do, so read that arm as a sign rather than a measurement.
-    The paper uses batch 64 and does not pin down the skip placement.
-    This is a negative result for this implementation, not a proof that
-    no skip would work.
+    The batch-64 probe is one seed. The paper uses 150 epochs and does
+    not pin down the skip placement. Both skip placements fail to flip
+    the ordering. This is a negative result for the obvious
+    architectural fix, not a proof that no implementation would work.
     """)
     return
 
@@ -1773,13 +1816,13 @@ def _(SCORE, mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    <p class="figure-caption">Table 1. Replication matrix.
+    <p class="figure-caption">Table 2. Replication matrix.
     <strong>Yes</strong> means the paper's ordering and scale are within
     our interval; <strong>No</strong> means the ordering is inverted or
     the effect is missing; <strong>Partly</strong> means accuracy matches
-    but the effect does not. 3A was also tested with the block-3 skip;
-    the ordering stayed inverted. Full notes and probes are in the lab
-    notebook.</p>
+    but the effect does not. 3A was also tested with pooled and spatial
+    skips, at batch 512 and 64; the ordering stayed inverted. Full notes
+    and probes are in the lab notebook.</p>
     """)
     return
 
@@ -1791,10 +1834,10 @@ def _(mo):
 
     Three experiments would change the conclusion:
 
-    - **A batch-64 skip rerun.** Our skip test used batch 512 and a
-      pooled concatenation. The paper uses batch 64 and does not pin down
-      the skip placement. A spatial skip at batch 64 is the next CIFAR
-      experiment.
+    - **A 10-seed batch-64 protocol.** Our batch-64 probe is one seed
+      and 75 epochs. The paper uses 150 epochs. A 10-seed run at the
+      paper's exact batch, schedule, and augmentation is the remaining
+      faithful CIFAR test.
     - **More seeds for the slow-head control.** Three seeds and 100
       epochs is a sign. Ten seeds and 250 epochs is a measurement.
     - **A rank diagnostic for IMDB.** The hidden layer is 128 units from

@@ -110,6 +110,7 @@ def _(mo):
     - `scripts/cifar_skip_experiment.py` tests the block-3 skip as a
       pooled concatenation of block 3 and block 4. At 150 epochs, 2 seeds,
       batch 512, it lowered the absolute SD but did not flip the ordering.
+      A spatial skip at batch 64, 75 epochs, 1 seed, also failed to flip it.
     - Every run (including AW = 0) has the same output layer,
       `Linear(2000, 10 + target_dim)` (`target_dim` = 2512 for `concat`, 2000
       for `hidden`), so seeds share identical classification rows.
