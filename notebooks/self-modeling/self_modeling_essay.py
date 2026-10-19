@@ -2502,10 +2502,131 @@ def _(IDENTITY, mo):
     **{_fz_acc:.0%}**), because a fixed random head with a
     detached, moving target has no stable solution. That control
     is therefore inconclusive: it breaks the run rather than
-    holding the shortcut fixed. On this evidence the mechanism is
-    supported by correlation, not proof. A slowed-head control,
-    annealing the self-model rows instead of freezing them, is the
-    natural next test.
+    holding the shortcut fixed.
+    """)
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""
+    ### Slowing the shortcut down
+
+    If the effect is missing on IMDB because the self-model rows
+    learn their shortcut and the pressure dies before it can act,
+    then slowing those rows down should bring it back. We scaled
+    the self-model rows' gradient by 0.01 and 0.001 after
+    per-model clipping and re-ran AW 0/100/500 (3 seeds, 100
+    epochs); nothing else changed.
+    """)
+    return
+
+
+@app.cell
+def _(json, mo):
+    _runs = json.loads(
+        (
+            mo.notebook_location()
+            / "public"
+            / "data"
+            / "slowhead_control.json"
+        ).read_text()
+    )["runs"]
+    _scales = (
+        ("scale1", "1 (normal)"),
+        ("scale0.01", "0.01"),
+        ("scale0.001", "0.001"),
+    )
+    _aws = (0.0, 100.0, 500.0)
+    _stat = {}
+    _lines = [
+        (
+            "| self-model LR scale | AW | epoch-100 SD (± CI) | "
+            "accuracy | epoch-100 self-model share |"
+        ),
+        "| ---: | ---: | ---: | ---: | ---: |",
+    ]
+    for _scale, _label in _scales:
+        for _aw in _aws:
+            _entry = _runs[_scale]["results"][f"{_aw:g}"]
+            _sd = float(_entry["sd_mean"][100])
+            _half = float(_entry["sd_ci"][100])
+            _acc = float(_entry["acc_mean"])
+            _raw = _entry["identity"]["sm_grad_share"]["mean"][99]
+            _share = None if _raw is None else float(_raw)
+            _stat[(_scale, _aw)] = {
+                "sd": _sd,
+                "half": _half,
+                "acc": _acc,
+                "share": _share,
+            }
+            _share_text = "—" if _share is None else f"{_share:.1%}"
+            _lines.append(
+                f"| {_label} | {_aw:g} | {_sd:.3f} ± {_half:.3f} "
+                f"| {_acc:.1%} | {_share_text} |"
+            )
+    _table = "\n".join(_lines)
+
+    def _effect(_scale, _aw):
+        _base = _stat[(_scale, 0.0)]
+        _v = _stat[(_scale, _aw)]
+        _pct = (_v["sd"] - _base["sd"]) / _base["sd"] * 100.0
+        _b_lo = _base["sd"] - _base["half"]
+        _b_hi = _base["sd"] + _base["half"]
+        _lo = _v["sd"] - _v["half"]
+        _hi = _v["sd"] + _v["half"]
+        _overlap = not (_hi < _b_lo or _lo > _b_hi)
+        return _pct, _overlap
+
+    _pct100, _ov100 = _effect("scale0.01", 100.0)
+    _pct500, _ov500 = _effect("scale0.01", 500.0)
+    _pct100n, _ov100n = _effect("scale1", 100.0)
+    _pct500n, _ov500n = _effect("scale1", 500.0)
+    _ci100 = "overlaps" if _ov100 else "does not overlap"
+    _ci500 = "overlaps" if _ov500 else "does not overlap"
+    _normal_ci = (
+        "both intervals overlap the baseline"
+        if _ov100n and _ov500n
+        else "the intervals behave as shown in the table"
+    )
+    _share100 = _stat[("scale0.01", 100.0)]["share"]
+    _share500 = _stat[("scale0.01", 500.0)]["share"]
+    _acc_small100 = _stat[("scale0.001", 100.0)]["acc"]
+    _acc_small500 = _stat[("scale0.001", 500.0)]["acc"]
+
+    mo.md(f"""
+    {_table}
+
+    At self-model scale **0.01** the pressure survives. The
+    epoch-100 self-model share is **{_share100:.0%}** at AW 100
+    and **{_share500:.0%}** at AW 500, the same range as MNIST.
+    With that pressure still present, AW 100 narrows the epoch-100
+    SD by **{_pct100:+.1f}%** and AW 500 by **{_pct500:+.1f}%**
+    against the AW 0 baseline; the AW 100 interval {_ci100} the
+    baseline and the AW 500 interval {_ci500} it. In the normal
+    run (scale 1) the same changes are only **{_pct100n:+.1f}%**
+    and **{_pct500n:+.1f}%**, and {_normal_ci}. Changing only how
+    fast the shortcut can be learned switches the effect on, which
+    is causal support for the mechanism: the narrowing tracks the
+    pressure, not the run configuration.
+
+    At self-model scale **0.001** the pressure instead swamps
+    classification. Accuracy falls to **{_acc_small100:.0%}** and
+    **{_acc_small500:.0%}**, near the 50% chance line, like the
+    small-network collapse on MNIST, so the classifier never forms
+    and those SDs are not interpretable. The control also has
+    caveats: 3 seeds and 100 epochs; accuracy drops as the
+    self-model rows slow, where the paper's AW 500 is slightly
+    *better* than baseline; the effect is not monotone in AW (AW
+    100 narrows more than AW 500); and it is smaller than the
+    paper's. This is a modified setup that explains our null
+    result, not a reproduction of the paper's numbers.
+
+    Taken with the gradient-share evidence above, the control adds
+    causal evidence for the mechanism, from a small modified
+    experiment: on IMDB the self-model pressure dies before it can
+    act, and when it is held open the classifier narrows as
+    predicted. More seeds and longer runs would firm this up.
     """)
     return
 
