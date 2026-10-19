@@ -12,7 +12,7 @@ check:
         uv run --no-project python scripts/check_empty_cells.py $files
     fi
     uvx typos
-    uvx ruff check notebooks templates
+    uvx ruff check notebooks templates scripts
 
 # Run a notebook headless in script mode.
 smoke path:

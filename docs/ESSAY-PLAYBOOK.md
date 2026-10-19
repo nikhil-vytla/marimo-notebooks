@@ -168,6 +168,14 @@ A dropdown of variants, the same metric and axis for each, and the
 result table. The empty result is a result. The CIFAR probe table is
 this pattern.
 
+### Direct manipulation
+
+A drag target beats a slider when the thing being changed has a shape.
+The compression dial in the self-modeling essay is this pattern: the
+reader drags a dial, the hidden cloud shrinks, and two bars show the
+classifier growing to compensate. The widget interpolates precomputed
+frames, so the interaction is instant and the numbers stay reproducible.
+
 ### Contrast two datasets
 
 Run the same ablation on the dataset where the effect is real and the

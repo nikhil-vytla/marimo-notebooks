@@ -101,6 +101,15 @@ just session notebooks/<slug>/<slug>.py
 Refresh the saved session after every change. Molab uses it to show
 outputs without running the notebook.
 
+## Direct manipulation
+
+If the essay needs a hero interaction, the shell stops short on purpose.
+The compression dial in the self-modeling essay is the reference: an
+`anywidget` that drags, toggles, and interpolates precomputed frames.
+Copy the shape, not the file. Keep the widget's data in
+`public/data/`, keep the Python readout in a separate cell, and test the
+keyboard path as well as the pointer path.
+
 ## When not to use the shell
 
 If the essay is one figure and three paragraphs, a plain notebook is

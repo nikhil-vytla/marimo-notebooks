@@ -5,6 +5,8 @@
 #     "numpy==2.5.3",
 #     "pandas==3.0.6",
 #     "altair==6.3.0",
+#     "anywidget==0.11.0",
+#     "traitlets==5.16.1",
 # ]
 # ///
 
@@ -216,6 +218,476 @@ def _(alt, aw_slider, mo, np, pd):
         for _a in _sample
     ]
     mo.vstack([_summary, _chart, mo.md("\n".join(_lines))])
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""
+    ## The compression dial
+
+    The dial is the paper's mechanism in one picture. A hidden layer
+    produces a cloud of activations. A classifier reads the cloud, and
+    a self-model head tries to predict it. Add self-model pressure and
+    watch what the network does to the cloud and to the classifier.
+
+    Drag the dial. Toggle the stop-gradient. The two bars on the right
+    are the mean hidden norm and the classifier norm. Both runs drive
+    the self-model error to zero. The difference is what they do to the
+    representation to get there.
+    """)
+    return
+
+
+@app.cell
+def _(json, mo):
+    DIAL = json.loads(
+        (
+            mo.notebook_location()
+            / "public"
+            / "data"
+            / "compression_dial.json"
+        ).read_text()
+    )
+    return (DIAL,)
+
+
+@app.cell
+def _(DIAL, mo):
+    import anywidget
+    import traitlets
+
+    class CompressionDial(anywidget.AnyWidget):
+        _esm = r"""
+        function render({ model, el }) {
+          el.classList.add("compression-dial");
+          el.innerHTML = `
+            <style>
+              .compression-dial {
+                font-family: ui-sans-serif, system-ui, sans-serif;
+                color: #171717;
+                --cd-muted: #78716c;
+                --cd-line: #e7e5e4;
+                --cd-accent: #b45309;
+                --cd-green: #047857;
+              }
+              .compression-dial .cd-head {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                gap: 12px;
+                margin-bottom: 4px;
+              }
+              .compression-dial .cd-title {
+                font-size: 16px;
+                font-weight: 650;
+              }
+              .compression-dial .cd-sub {
+                font-size: 12.5px;
+                line-height: 1.35;
+                color: var(--cd-muted);
+                max-width: 430px;
+                margin-top: 2px;
+              }
+              .compression-dial .cd-toggle {
+                border: 1px solid var(--cd-line);
+                background: #fff;
+                border-radius: 999px;
+                padding: 6px 11px;
+                font: 600 12px/1 ui-sans-serif, system-ui, sans-serif;
+                cursor: pointer;
+                white-space: nowrap;
+              }
+              .compression-dial .cd-toggle.on {
+                background: #ecfdf5;
+                border-color: #a7f3d0;
+                color: var(--cd-green);
+              }
+              .compression-dial .cd-toggle.off {
+                background: #fffbeb;
+                border-color: #fde68a;
+                color: var(--cd-accent);
+              }
+              .compression-dial .cd-svg {
+                width: 100%;
+                height: auto;
+                display: block;
+                margin-top: 6px;
+              }
+              .compression-dial .cd-legend {
+                display: flex;
+                gap: 14px;
+                flex-wrap: wrap;
+                font-size: 12px;
+                color: var(--cd-muted);
+                margin-top: 2px;
+              }
+              .compression-dial .cd-dot {
+                width: 9px;
+                height: 9px;
+                border-radius: 50%;
+                display: inline-block;
+                margin-right: 5px;
+                vertical-align: middle;
+              }
+              .compression-dial .cd-foot {
+                font-size: 12px;
+                line-height: 1.45;
+                color: var(--cd-muted);
+                margin-top: 6px;
+              }
+            </style>
+            <div class="cd-root">
+              <div class="cd-head">
+                <div>
+                  <div class="cd-title">Compression dial</div>
+                  <div class="cd-sub">Drag the dial to add self-model pressure. The classifier has to keep the logits fixed.</div>
+                </div>
+                <button class="cd-toggle on" type="button" aria-pressed="true">detached target</button>
+              </div>
+              <svg class="cd-svg" viewBox="0 0 640 470" role="img" aria-label="Hidden activations and classifier norms as the self-model weight changes"></svg>
+              <div class="cd-legend">
+                <span><span class="cd-dot" style="background:#1d4ed8"></span>class 0</span>
+                <span><span class="cd-dot" style="background:#b45309"></span>class 1</span>
+                <span><span class="cd-dot" style="background:#047857"></span>class 2</span>
+              </div>
+              <div class="cd-foot">Both modes drive the self-model error to <strong>0.000</strong>. Only one keeps the hidden representation at its natural scale.</div>
+            </div>
+          `;
+          const svg = el.querySelector(".cd-svg");
+          const NS = "http://www.w3.org/2000/svg";
+          const W = 640, H = 470;
+          const panel = { x: 16, y: 48, w: 320, h: 320 };
+          const world = Number(model.get("world")) || 5.5;
+          const colors = ["#1d4ed8", "#b45309", "#047857"];
+          const labels = model.get("labels") || [];
+          const maxA = Number(model.get("max_a")) || 1;
+          const maxW = Number(model.get("max_w")) || 1;
+          const cx = panel.x + panel.w / 2;
+          const cy = panel.y + panel.h / 2;
+
+          function mk(name, attrs) {
+            const node = document.createElementNS(NS, name);
+            for (const [key, value] of Object.entries(attrs)) {
+              node.setAttribute(key, String(value));
+            }
+            return node;
+          }
+          function sx(x) {
+            return panel.x + ((x + world) / (2 * world)) * panel.w;
+          }
+          function sy(y) {
+            return panel.y + ((world - y) / (2 * world)) * panel.h;
+          }
+          function polar(centerX, centerY, radius, angle) {
+            const rad = (angle * Math.PI) / 180;
+            return {
+              x: centerX + radius * Math.cos(rad),
+              y: centerY + radius * Math.sin(rad),
+            };
+          }
+          function arcPath(centerX, centerY, radius, start, end) {
+            const a = polar(centerX, centerY, radius, start);
+            const b = polar(centerX, centerY, radius, end);
+            const large = end - start <= 180 ? 0 : 1;
+            return `M ${a.x} ${a.y} A ${radius} ${radius} 0 ${large} 1 ${b.x} ${b.y}`;
+          }
+          function lerp(a, b, t) {
+            return a + (b - a) * t;
+          }
+
+          const panelRect = mk("rect", {
+            x: panel.x, y: panel.y, width: panel.w, height: panel.h,
+            rx: 14, fill: "#fff", stroke: "#e7e5e4",
+          });
+          svg.appendChild(panelRect);
+
+          const grid = mk("g", {});
+          for (const tick of [-4, -2, 0, 2, 4]) {
+            grid.appendChild(mk("line", {
+              x1: sx(tick), y1: panel.y, x2: sx(tick), y2: panel.y + panel.h,
+              stroke: tick === 0 ? "#d6d3d1" : "#f5f5f4",
+            }));
+            grid.appendChild(mk("line", {
+              x1: panel.x, y1: sy(tick), x2: panel.x + panel.w, y2: sy(tick),
+              stroke: tick === 0 ? "#d6d3d1" : "#f5f5f4",
+            }));
+          }
+          svg.appendChild(grid);
+
+          const ringRadius = (2.5 / (2 * world)) * panel.w;
+          svg.appendChild(mk("circle", {
+            cx, cy, r: ringRadius, fill: "none", stroke: "#d6d3d1",
+            "stroke-dasharray": "4 4",
+          }));
+          const ringLabel = mk("text", {
+            x: cx, y: cy - ringRadius - 7,
+            "text-anchor": "middle", "font-size": 10, fill: "#a8a29e",
+          });
+          ringLabel.textContent = "|a| = 2.5";
+          svg.appendChild(ringLabel);
+
+          const pointsGroup = mk("g", {});
+          svg.appendChild(pointsGroup);
+          const circles = labels.map((label) => {
+            const circle = mk("circle", {
+              r: 3.2, fill: colors[label] || "#57534e", opacity: 0.82,
+            });
+            pointsGroup.appendChild(circle);
+            return circle;
+          });
+
+          const gauges = [
+            { key: "a_norm", label: "hidden state |a|", max: maxA, y: 66 },
+            { key: "w_norm", label: "classifier |W|", max: maxW, y: 126 },
+          ];
+          const gaugeNodes = gauges.map((gauge) => {
+            const label = mk("text", {
+              x: 372, y: gauge.y, "font-size": 12, fill: "#57534e",
+              "font-weight": 600,
+            });
+            label.textContent = gauge.label;
+            svg.appendChild(label);
+            const bg = mk("rect", {
+              x: 372, y: gauge.y + 8, width: 200, height: 12, rx: 6,
+              fill: "#f5f5f4",
+            });
+            svg.appendChild(bg);
+            const fill = mk("rect", {
+              x: 372, y: gauge.y + 8, width: 0, height: 12, rx: 6,
+              fill: "#b45309",
+            });
+            svg.appendChild(fill);
+            const value = mk("text", {
+              x: 580, y: gauge.y + 18, "font-size": 12, fill: "#57534e",
+              "text-anchor": "end", "font-variant-numeric": "tabular-nums",
+            });
+            svg.appendChild(value);
+            return { ...gauge, fill, value };
+          });
+
+          const smLabel = mk("text", {
+            x: 372, y: 196, "font-size": 12, fill: "#57534e", "font-weight": 600,
+          });
+          smLabel.textContent = "self-model error";
+          svg.appendChild(smLabel);
+          const smValue = mk("text", {
+            x: 580, y: 196, "font-size": 12, fill: "#57534e",
+            "text-anchor": "end", "font-variant-numeric": "tabular-nums",
+          });
+          smValue.textContent = "0.000";
+          svg.appendChild(smValue);
+          const smNote = mk("text", {
+            x: 372, y: 214, "font-size": 11, fill: "#a8a29e",
+          });
+          smNote.textContent = "both modes";
+          svg.appendChild(smNote);
+
+          const dialX = 176, dialY = 414, dialR = 38;
+          const track = mk("path", {
+            d: arcPath(dialX, dialY, dialR, 135, 405),
+            fill: "none", stroke: "#f5f5f4", "stroke-width": 9,
+            "stroke-linecap": "round",
+          });
+          svg.appendChild(track);
+          const active = mk("path", {
+            d: arcPath(dialX, dialY, dialR, 135, 140),
+            fill: "none", stroke: "#b45309", "stroke-width": 9,
+            "stroke-linecap": "round",
+          });
+          svg.appendChild(active);
+          const handle = mk("circle", {
+            cx: dialX, cy: dialY, r: 9, fill: "#fff", stroke: "#b45309",
+            "stroke-width": 3,
+          });
+          svg.appendChild(handle);
+          for (const tick of [0, 10, 20, 30, 40, 50]) {
+            const angle = 135 + (tick / 50) * 270;
+            const a = polar(dialX, dialY, dialR - 8, angle);
+            const b = polar(dialX, dialY, dialR - 13, angle);
+            svg.appendChild(mk("line", {
+              x1: a.x, y1: a.y, x2: b.x, y2: b.y,
+              stroke: "#d6d3d1", "stroke-width": 1.5,
+            }));
+          }
+          const awText = mk("text", {
+            x: dialX, y: dialY + 4, "text-anchor": "middle",
+            "font-size": 20, "font-weight": 700, fill: "#171717",
+            "font-variant-numeric": "tabular-nums",
+          });
+          awText.textContent = "5";
+          svg.appendChild(awText);
+          const awLabel = mk("text", {
+            x: dialX, y: dialY + 20, "text-anchor": "middle",
+            "font-size": 10, "letter-spacing": "0.12em", fill: "#a8a29e",
+          });
+          awLabel.textContent = "AW";
+          svg.appendChild(awLabel);
+
+          const hit = mk("circle", {
+            cx: dialX, cy: dialY, r: 56, fill: "transparent",
+            style: "cursor: grab; touch-action: none;",
+            tabindex: 0, role: "slider",
+            "aria-valuemin": 0, "aria-valuemax": 50, "aria-valuenow": 5,
+            "aria-label": "Self-model weight AW",
+          });
+          svg.appendChild(hit);
+
+          const toggle = el.querySelector(".cd-toggle");
+          let dragging = false;
+
+          function frameAt(aw) {
+            const mode = model.get("detach") ? "detach" : "no_detach";
+            const frames = (model.get("frames") || {})[mode] || [];
+            if (!frames.length) return null;
+            let i = 0;
+            while (i < frames.length - 2 && frames[i + 1].aw < aw) i += 1;
+            const a = frames[i];
+            const b = frames[Math.min(i + 1, frames.length - 1)];
+            const t = b.aw === a.aw ? 0 : Math.max(0, Math.min(1, (aw - a.aw) / (b.aw - a.aw)));
+            return { a, b, t };
+          }
+
+          function update() {
+            const aw = Number(model.get("aw"));
+            const pair = frameAt(aw);
+            if (!pair) return;
+            const { a, b, t } = pair;
+            for (let i = 0; i < circles.length; i += 1) {
+              const p0 = a.points[i];
+              const p1 = b.points[i];
+              circles[i].setAttribute("cx", sx(lerp(p0[0], p1[0], t)));
+              circles[i].setAttribute("cy", sy(lerp(p0[1], p1[1], t)));
+            }
+            const values = {
+              a_norm: lerp(a.a_norm, b.a_norm, t),
+              w_norm: lerp(a.w_norm, b.w_norm, t),
+            };
+            for (const gauge of gaugeNodes) {
+              const width = Math.max(0, Math.min(1, values[gauge.key] / gauge.max)) * 200;
+              gauge.fill.setAttribute("width", width);
+              gauge.value.textContent = values[gauge.key].toFixed(2);
+            }
+            const angle = 135 + (Math.max(0, Math.min(50, aw)) / 50) * 270;
+            active.setAttribute("d", arcPath(dialX, dialY, dialR, 135, Math.max(135.01, angle)));
+            const pos = polar(dialX, dialY, dialR, angle);
+            handle.setAttribute("cx", pos.x);
+            handle.setAttribute("cy", pos.y);
+            awText.textContent = Math.round(aw);
+            hit.setAttribute("aria-valuenow", String(Math.round(aw)));
+            const detached = !!model.get("detach");
+            toggle.textContent = detached ? "detached target" : "no detach";
+            toggle.classList.toggle("on", detached);
+            toggle.classList.toggle("off", !detached);
+            toggle.setAttribute("aria-pressed", String(detached));
+          }
+
+          function setAw(value) {
+            const aw = Math.max(0, Math.min(50, value));
+            model.set("aw", aw);
+            model.save_changes();
+            update();
+          }
+
+          function pointerToAw(event) {
+            const rect = svg.getBoundingClientRect();
+            const x = ((event.clientX - rect.left) / rect.width) * W;
+            const y = ((event.clientY - rect.top) / rect.height) * H;
+            let angle = (Math.atan2(y - dialY, x - dialX) * 180) / Math.PI;
+            if (angle < 135) angle += 360;
+            angle = Math.max(135, Math.min(405, angle));
+            return ((angle - 135) / 270) * 50;
+          }
+
+          hit.addEventListener("pointerdown", (event) => {
+            dragging = true;
+            hit.setPointerCapture(event.pointerId);
+            setAw(pointerToAw(event));
+          });
+          hit.addEventListener("pointermove", (event) => {
+            if (dragging) setAw(pointerToAw(event));
+          });
+          hit.addEventListener("pointerup", (event) => {
+            dragging = false;
+            try { hit.releasePointerCapture(event.pointerId); } catch (error) {}
+          });
+          hit.addEventListener("pointercancel", () => { dragging = false; });
+          hit.addEventListener("keydown", (event) => {
+            const step = 5;
+            const current = Number(model.get("aw"));
+            if (event.key === "ArrowLeft" || event.key === "ArrowDown") {
+              event.preventDefault();
+              setAw(current - step);
+            } else if (event.key === "ArrowRight" || event.key === "ArrowUp") {
+              event.preventDefault();
+              setAw(current + step);
+            } else if (event.key === "Home") {
+              event.preventDefault();
+              setAw(0);
+            } else if (event.key === "End") {
+              event.preventDefault();
+              setAw(50);
+            }
+          });
+          toggle.addEventListener("click", () => {
+            model.set("detach", !model.get("detach"));
+            model.save_changes();
+            update();
+          });
+          model.on("change:aw", update);
+          model.on("change:detach", update);
+          update();
+          return () => {
+            model.off("change:aw", update);
+            model.off("change:detach", update);
+          };
+        }
+        export default { render };
+        """
+        aw = traitlets.Float(5.0).tag(sync=True)
+        detach = traitlets.Bool(True).tag(sync=True)
+        frames = traitlets.Dict(default_value={}).tag(sync=True)
+        labels = traitlets.List(default_value=[]).tag(sync=True)
+        max_a = traitlets.Float(1.0).tag(sync=True)
+        max_w = traitlets.Float(1.0).tag(sync=True)
+        world = traitlets.Float(5.5).tag(sync=True)
+
+    dial = mo.ui.anywidget(
+        CompressionDial(
+            frames=DIAL["frames"],
+            labels=DIAL["labels"],
+            max_a=DIAL["max_a"],
+            max_w=DIAL["max_w"],
+            world=DIAL["world"],
+            aw=5.0,
+            detach=True,
+        )
+    )
+    dial
+    return (dial,)
+
+
+@app.cell
+def _(DIAL, dial, mo):
+    _out = mo.md("_The dial is available in the interactive notebook._")
+    if dial is not None:
+        _aw = min(DIAL["aws"], key=lambda _a: abs(_a - dial.aw))
+        _detached = next(
+            f for f in DIAL["frames"]["detach"] if f["aw"] == _aw
+        )
+        _plain = next(
+            f for f in DIAL["frames"]["no_detach"] if f["aw"] == _aw
+        )
+        _out = mo.md(f"""
+        At AW = **{_aw:.0f}**, the detached run has hidden norm
+        **{_detached["a_norm"]:.2f}** and classifier norm
+        **{_detached["w_norm"]:.2f}**. Without the stop-gradient:
+        **{_plain["a_norm"]:.2f}** and **{_plain["w_norm"]:.2f}**.
+        The self-model error is **{_detached["sm_error"]:.3f}** in both
+        modes. Both solve the prediction task; only the detached run
+        keeps the representation at its natural scale.
+        """)
+    _out
     return
 
 
