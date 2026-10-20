@@ -558,7 +558,7 @@ def _(DIAL, mo):
               <div class="cd-head">
                 <div>
                   <div class="cd-title">Compression dial</div>
-                  <div class="cd-sub">Drag the dial to add self-model pressure. The classifier has to keep the logits fixed.</div>
+                  <div class="cd-sub">Drag the dial or the norm strip to add self-model pressure. The classifier has to keep the logits fixed.</div>
                 </div>
                 <div class="cd-actions">
                   <button class="cd-play" type="button" aria-pressed="false">Play</button>
@@ -694,6 +694,120 @@ def _(DIAL, mo):
           });
           smNote.textContent = "both modes";
           svg.appendChild(smNote);
+
+          // Linked view: the same AW state as a pair of norm traces.
+          // The dial scrubs it; the strip scrubs the dial.
+          const chartX = 372, chartW = 208, chartTop = 264;
+          svg.appendChild(mk("rect", {
+            x: 364, y: 240, width: 224, height: 174, rx: 10,
+            fill: "#fff", stroke: "#e7e5e4",
+          }));
+          const chartTitle = mk("text", {
+            x: chartX, y: 257, "font-size": 10, "font-weight": 600,
+            fill: "#57534e",
+          });
+          chartTitle.textContent = "norms across AW · click to scrub";
+          svg.appendChild(chartTitle);
+
+          function sparkline(top, label, color) {
+            const labelNode = mk("text", {
+              x: chartX, y: top + 9, "font-size": 10, fill: "#57534e",
+              "font-weight": 600,
+            });
+            labelNode.textContent = label;
+            svg.appendChild(labelNode);
+            const valueNode = mk("text", {
+              x: chartX + chartW, y: top + 9, "font-size": 10,
+              fill: "#57534e", "text-anchor": "end",
+              "font-variant-numeric": "tabular-nums",
+            });
+            svg.appendChild(valueNode);
+            svg.appendChild(mk("line", {
+              x1: chartX, y1: top + 46, x2: chartX + chartW, y2: top + 46,
+              stroke: "#f5f5f4",
+            }));
+            const path = mk("path", {
+              fill: "none", stroke: color, "stroke-width": 2,
+              "stroke-linecap": "round", "stroke-linejoin": "round",
+            });
+            svg.appendChild(path);
+            const dot = mk("circle", { r: 3.2, fill: color });
+            svg.appendChild(dot);
+            return { path, dot, valueNode, top };
+          }
+
+          const hiddenSpark = sparkline(270, "hidden |a|", "#b45309");
+          const classSpark = sparkline(330, "classifier |W|", "#111827");
+          const guide = mk("line", {
+            y1: 266, y2: 390, stroke: "#a8a29e", "stroke-dasharray": "3 3",
+          });
+          svg.appendChild(guide);
+          for (const [tick, anchor] of [[0, "start"], [25, "middle"], [50, "end"]]) {
+            const label = mk("text", {
+              x: chartX + (tick / 50) * chartW, y: 404,
+              "text-anchor": anchor, "font-size": 9, fill: "#a8a29e",
+            });
+            label.textContent = String(tick);
+            svg.appendChild(label);
+          }
+          const chartHit = mk("rect", {
+            x: chartX, y: 264, width: chartW, height: 128,
+            fill: "transparent", style: "cursor: ew-resize; touch-action: none;",
+            "aria-label": "Scrub AW on the norm chart",
+          });
+          svg.appendChild(chartHit);
+
+          function normPath(frames, key, maxValue, top) {
+            return frames.map((frame, index) => {
+              const x = chartX + (frame.aw / 50) * chartW;
+              const y = top + 42 - Math.min(1, frame[key] / maxValue) * 28;
+              return `${index === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
+            }).join(" ");
+          }
+
+          function updateChart() {
+            const aw = Number(model.get("aw"));
+            const mode = model.get("detach") ? "detach" : "no_detach";
+            const frames = (model.get("frames") || {})[mode] || [];
+            const pair = frameAt(aw);
+            if (!frames.length || !pair) return;
+            const aValue = lerp(pair.a.a_norm, pair.b.a_norm, pair.t);
+            const wValue = lerp(pair.a.w_norm, pair.b.w_norm, pair.t);
+            hiddenSpark.path.setAttribute("d", normPath(frames, "a_norm", maxA, hiddenSpark.top));
+            classSpark.path.setAttribute("d", normPath(frames, "w_norm", maxW, classSpark.top));
+            const x = chartX + (aw / 50) * chartW;
+            const ya = hiddenSpark.top + 42 - Math.min(1, aValue / maxA) * 28;
+            const yw = classSpark.top + 42 - Math.min(1, wValue / maxW) * 28;
+            hiddenSpark.dot.setAttribute("cx", x);
+            hiddenSpark.dot.setAttribute("cy", ya);
+            classSpark.dot.setAttribute("cx", x);
+            classSpark.dot.setAttribute("cy", yw);
+            hiddenSpark.valueNode.textContent = aValue.toFixed(2);
+            classSpark.valueNode.textContent = wValue.toFixed(2);
+            guide.setAttribute("x1", x);
+            guide.setAttribute("x2", x);
+          }
+
+          let chartDragging = false;
+          function chartPointer(event) {
+            const rect = svg.getBoundingClientRect();
+            const x = ((event.clientX - rect.left) / rect.width) * W;
+            setAw(((x - chartX) / chartW) * 50);
+          }
+          chartHit.addEventListener("pointerdown", (event) => {
+            stopPlayback();
+            chartDragging = true;
+            chartHit.setPointerCapture(event.pointerId);
+            chartPointer(event);
+          });
+          chartHit.addEventListener("pointermove", (event) => {
+            if (chartDragging) chartPointer(event);
+          });
+          chartHit.addEventListener("pointerup", (event) => {
+            chartDragging = false;
+            try { chartHit.releasePointerCapture(event.pointerId); } catch (error) {}
+          });
+          chartHit.addEventListener("pointercancel", () => { chartDragging = false; });
 
           const dialX = 176, dialY = 414, dialR = 38;
           svg.appendChild(mk("path", {
@@ -832,6 +946,7 @@ def _(DIAL, mo):
             toggle.classList.toggle("on", detached);
             toggle.classList.toggle("off", !detached);
             toggle.setAttribute("aria-pressed", String(detached));
+            updateChart();
           }
 
           function setAw(value) {
@@ -954,7 +1069,8 @@ def _(mo):
     <p class="figure-caption">Figure 2. The compression dial. The hidden
     cloud is a 2D toy trained for each AW; the dial interpolates 11
     precomputed frames. Both modes reach self-model error 0.000. Drag
-    the dial, press Play, or toggle the stop-gradient. Source:
+    the dial, click the norm strip, press Play, or toggle the
+    stop-gradient. Source:
     <code>compression_dial.json</code>; generator:
     <code>scripts/build_compression_dial.py</code>.</p>
     """)
@@ -1665,18 +1781,26 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Two failures, two mechanisms. The figure is the whole result in one
-    glance.
+    Two failures, two mechanisms. Build the figure one piece at a time,
+    or show both.
     """)
     return
 
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.Html(
-        """
-        <div class="mechanism-grid">
-          <div class="mechanism-card">
+    MECH_STEP = mo.ui.radio(
+        options=["1. units", "2. timing", "3. both"],
+        value="3. both",
+        label="Build the synthesis",
+        inline=True,
+    )
+    return (MECH_STEP,)
+
+
+@app.cell(hide_code=True)
+def _(MECH_STEP, mo):
+    _units = """<div class="mechanism-card">
             <div class="mechanism-kicker">CIFAR-10 · units</div>
             <svg class="mechanism-svg" viewBox="0 0 280 150"
                  role="img"
@@ -1729,8 +1853,8 @@ def _(mo):
             The activations shrink and the classifier grows to keep the
             logits fixed. The wider SD is a units change, not a new
             complexity.</p>
-          </div>
-          <div class="mechanism-card">
+          </div>"""
+    _timing = """<div class="mechanism-card">
             <div class="mechanism-kicker">IMDB · timing</div>
             <svg class="mechanism-svg" viewBox="0 0 280 150"
                  role="img"
@@ -1759,9 +1883,19 @@ def _(mo):
             The self-model share of the hidden-layer gradient falls to
             about 2% by epoch 20. Slow the head down and the effect comes
             back.</p>
-          </div>
-        </div>
-        """
+          </div>"""
+    _cards = []
+    if MECH_STEP.value in ("1. units", "3. both"):
+        _cards.append(_units)
+    if MECH_STEP.value in ("2. timing", "3. both"):
+        _cards.append(_timing)
+    mo.vstack(
+        [
+            MECH_STEP,
+            mo.Html(
+                f'<div class="mechanism-grid">{"".join(_cards)}</div>'
+            ),
+        ]
     )
     return
 

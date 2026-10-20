@@ -1,7 +1,7 @@
 {
   "version": "1",
   "metadata": {
-    "marimo_version": "0.25.1",
+    "marimo_version": "0.25.2",
     "script_metadata_hash": "31938ce6f1dce96eeecb02b3d1611bdf"
   },
   "cells": [
@@ -163,12 +163,12 @@
     },
     {
       "id": "Hstk",
-      "code_hash": "7e590a91b22bf9e08f4910e265e21f97",
+      "code_hash": "6157f1b9e5185419281630f5d2f0532e",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/html": "<marimo-ui-element object-id='Hstk-0' random-id='ce4406e9-7b7d-d428-5471-89924597acf8'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;12edae00db7749f98d693c97ef8e3cc9&quot;}' data-label='null' data-model-id='&quot;12edae00db7749f98d693c97ef8e3cc9&quot;'></marimo-anywidget></marimo-ui-element>"
+            "text/html": "<marimo-ui-element object-id='Hstk-0' random-id='be06fc0e-67ed-6875-778d-8f75a8235e9b'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;278505682c4b41f3be0da326ca1dfce2&quot;}' data-label='null' data-model-id='&quot;278505682c4b41f3be0da326ca1dfce2&quot;'></marimo-anywidget></marimo-ui-element>"
           }
         }
       ],
@@ -189,12 +189,12 @@
     },
     {
       "id": "iLit",
-      "code_hash": "0ff2779c513cdc010dc1985550f4165c",
+      "code_hash": "850c44f150d4814acf906dc4d8ce6360",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><p class=\"figure-caption\">Figure 2. The compression dial. The hidden\ncloud is a 2D toy trained for each AW; the dial interpolates 11\nprecomputed frames. Both modes reach self-model error 0.000. Drag\nthe dial, press Play, or toggle the stop-gradient. Source:\n<code>compression_dial.json</code>; generator:\n<code>scripts/build_compression_dial.py</code>.</span></span>"
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><p class=\"figure-caption\">Figure 2. The compression dial. The hidden\ncloud is a 2D toy trained for each AW; the dial interpolates 11\nprecomputed frames. Both modes reach self-model error 0.000. Drag\nthe dial, click the norm strip, press Play, or toggle the\nstop-gradient. Source:\n<code>compression_dial.json</code>; generator:\n<code>scripts/build_compression_dial.py</code>.</span></span>"
           }
         }
       ],
@@ -220,7 +220,7 @@
         {
           "type": "data",
           "data": {
-            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='ROlb-0' random-id='e644cb43-dfe9-a59e-dd2e-209451527c79'><marimo-radio data-initial-value='null' data-label='&quot;&#92;u003cspan class=&#92;&quot;markdown prose dark:prose-invert contents&#92;&quot;&#92;u003e&#92;u003cspan class=&#92;&quot;paragraph&#92;&quot;&#92;u003eWhich dataset is sensitive to the stop-gradient?&#92;u003c/span&#92;u003e&#92;u003c/span&#92;u003e&quot;' data-options='[&quot;MNIST&quot;,&quot;CIFAR-10&quot;,&quot;Both&quot;,&quot;Neither&quot;]' data-inline='false' data-disabled='false'></marimo-radio></marimo-ui-element><marimo-ui-element object-id='ROlb-1' random-id='6645fae3-d922-d183-f4ee-5b5e6a0215e8'><marimo-checkbox data-initial-value='false' data-label='&quot;&#92;u003cspan class=&#92;&quot;markdown prose dark:prose-invert contents&#92;&quot;&#92;u003e&#92;u003cspan class=&#92;&quot;paragraph&#92;&quot;&#92;u003eReveal the ablation&#92;u003c/span&#92;u003e&#92;u003c/span&#92;u003e&quot;' data-disabled='false'></marimo-checkbox></marimo-ui-element></div>"
+            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='ROlb-0' random-id='716c1506-5b28-edda-d1fe-4ab37191be70'><marimo-radio data-initial-value='null' data-label='&quot;&#92;u003cspan class=&#92;&quot;markdown prose dark:prose-invert contents&#92;&quot;&#92;u003e&#92;u003cspan class=&#92;&quot;paragraph&#92;&quot;&#92;u003eWhich dataset is sensitive to the stop-gradient?&#92;u003c/span&#92;u003e&#92;u003c/span&#92;u003e&quot;' data-options='[&quot;MNIST&quot;,&quot;CIFAR-10&quot;,&quot;Both&quot;,&quot;Neither&quot;]' data-inline='false' data-disabled='false'></marimo-radio></marimo-ui-element><marimo-ui-element object-id='ROlb-1' random-id='f5058837-be0f-1920-8b2d-792eb80e592e'><marimo-checkbox data-initial-value='false' data-label='&quot;&#92;u003cspan class=&#92;&quot;markdown prose dark:prose-invert contents&#92;&quot;&#92;u003e&#92;u003cspan class=&#92;&quot;paragraph&#92;&quot;&#92;u003eReveal the ablation&#92;u003c/span&#92;u003e&#92;u003c/span&#92;u003e&quot;' data-disabled='false'></marimo-checkbox></marimo-ui-element></div>"
           }
         }
       ],
@@ -371,12 +371,12 @@
     },
     {
       "id": "AjVT",
-      "code_hash": "c72b4a47db308760b19c256a99d5c87d",
+      "code_hash": "befb5f623b082622c00df0a8abe92c17",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">Two failures, two mechanisms. The figure is the whole result in one\nglance.</span></span>"
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><span class=\"paragraph\">Two failures, two mechanisms. Build the figure one piece at a time,\nor show both.</span></span>"
           }
         }
       ],
@@ -384,12 +384,12 @@
     },
     {
       "id": "pHFh",
-      "code_hash": "38ce2115693b8629986bfc1198f81a2d",
+      "code_hash": "8011fc56ca78df0227902757c15e7e05",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/html": "\n    <div class=\"mechanism-grid\">\n      <div class=\"mechanism-card\">\n        <div class=\"mechanism-kicker\">CIFAR-10 \u00b7 units</div>\n        <svg class=\"mechanism-svg\" viewBox=\"0 0 280 150\"\n             role=\"img\"\n             aria-label=\"Hidden activations shrink while the classifier grows\">\n          <defs>\n            <marker id=\"mech-arrow\" viewBox=\"0 0 10 10\" refX=\"9\"\n                    refY=\"5\" markerWidth=\"5\" markerHeight=\"5\"\n                    orient=\"auto\">\n              <path d=\"M0,0 L10,5 L0,10 z\" fill=\"#a8a29e\"/>\n            </marker>\n          </defs>\n          <text x=\"44\" y=\"16\" text-anchor=\"middle\" font-size=\"10\"\n                fill=\"#78716c\">AW 0</text>\n          <text x=\"200\" y=\"16\" text-anchor=\"middle\" font-size=\"10\"\n                fill=\"#78716c\">AW 2</text>\n          <g opacity=\"0.85\">\n            <circle cx=\"30\" cy=\"50\" r=\"3.2\" fill=\"#1d4ed8\"/>\n            <circle cx=\"42\" cy=\"46\" r=\"3.2\" fill=\"#1d4ed8\"/>\n            <circle cx=\"52\" cy=\"56\" r=\"3.2\" fill=\"#1d4ed8\"/>\n            <circle cx=\"34\" cy=\"70\" r=\"3.2\" fill=\"#b45309\"/>\n            <circle cx=\"46\" cy=\"68\" r=\"3.2\" fill=\"#b45309\"/>\n            <circle cx=\"58\" cy=\"74\" r=\"3.2\" fill=\"#b45309\"/>\n            <circle cx=\"32\" cy=\"90\" r=\"3.2\" fill=\"#047857\"/>\n            <circle cx=\"44\" cy=\"92\" r=\"3.2\" fill=\"#047857\"/>\n            <circle cx=\"56\" cy=\"88\" r=\"3.2\" fill=\"#047857\"/>\n            <circle cx=\"192\" cy=\"64\" r=\"3.2\" fill=\"#1d4ed8\"/>\n            <circle cx=\"199\" cy=\"62\" r=\"3.2\" fill=\"#1d4ed8\"/>\n            <circle cx=\"206\" cy=\"68\" r=\"3.2\" fill=\"#1d4ed8\"/>\n            <circle cx=\"194\" cy=\"76\" r=\"3.2\" fill=\"#b45309\"/>\n            <circle cx=\"201\" cy=\"74\" r=\"3.2\" fill=\"#b45309\"/>\n            <circle cx=\"208\" cy=\"80\" r=\"3.2\" fill=\"#b45309\"/>\n            <circle cx=\"192\" cy=\"88\" r=\"3.2\" fill=\"#047857\"/>\n            <circle cx=\"199\" cy=\"90\" r=\"3.2\" fill=\"#047857\"/>\n            <circle cx=\"206\" cy=\"86\" r=\"3.2\" fill=\"#047857\"/>\n          </g>\n          <line x1=\"95\" y1=\"80\" x2=\"135\" y2=\"80\" stroke=\"#a8a29e\"\n                stroke-width=\"1.5\" marker-end=\"url(#mech-arrow)\"/>\n          <text x=\"115\" y=\"70\" text-anchor=\"middle\" font-size=\"9\"\n                fill=\"#78716c\">AW \u2191</text>\n          <rect x=\"30\" y=\"118\" width=\"40\" height=\"8\" rx=\"3\"\n                fill=\"#b45309\" opacity=\"0.8\"/>\n          <rect x=\"176\" y=\"118\" width=\"60\" height=\"8\" rx=\"3\"\n                fill=\"#b45309\" opacity=\"0.8\"/>\n          <text x=\"50\" y=\"140\" text-anchor=\"middle\" font-size=\"9\"\n                fill=\"#78716c\">|W| small</text>\n          <text x=\"206\" y=\"140\" text-anchor=\"middle\" font-size=\"9\"\n                fill=\"#78716c\">|W| grows</text>\n        </svg>\n        <p class=\"mechanism-text\"><strong>SD / |W| stays flat.</strong>\n        The activations shrink and the classifier grows to keep the\n        logits fixed. The wider SD is a units change, not a new\n        complexity.</p>\n      </div>\n      <div class=\"mechanism-card\">\n        <div class=\"mechanism-kicker\">IMDB \u00b7 timing</div>\n        <svg class=\"mechanism-svg\" viewBox=\"0 0 280 150\"\n             role=\"img\"\n             aria-label=\"Self-model gradient share falls to two percent by epoch twenty\">\n          <line x1=\"28\" y1=\"120\" x2=\"260\" y2=\"120\" stroke=\"#d6d3d1\"/>\n          <line x1=\"28\" y1=\"120\" x2=\"28\" y2=\"30\" stroke=\"#d6d3d1\"/>\n          <line x1=\"28\" y1=\"111\" x2=\"260\" y2=\"111\" stroke=\"#d6d3d1\"\n                stroke-dasharray=\"4 4\"/>\n          <text x=\"250\" y=\"107\" text-anchor=\"end\" font-size=\"9\"\n                fill=\"#a8a29e\">2%</text>\n          <polyline points=\"28,39 49,52 70,84 91,102 112,111 154,111 196,111 238,111\"\n                    fill=\"none\" stroke=\"#b45309\" stroke-width=\"3\"\n                    stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n          <circle cx=\"112\" cy=\"111\" r=\"3.5\" fill=\"#b45309\"/>\n          <text x=\"120\" y=\"96\" font-size=\"9\" fill=\"#78716c\">pressure dies</text>\n          <text x=\"28\" y=\"24\" font-size=\"9\" fill=\"#78716c\">self-model share</text>\n          <text x=\"28\" y=\"136\" font-size=\"9\" fill=\"#a8a29e\">0</text>\n          <text x=\"112\" y=\"136\" text-anchor=\"middle\" font-size=\"9\"\n                fill=\"#a8a29e\">20</text>\n          <text x=\"196\" y=\"136\" text-anchor=\"middle\" font-size=\"9\"\n                fill=\"#a8a29e\">40</text>\n          <text x=\"260\" y=\"136\" text-anchor=\"end\" font-size=\"9\"\n                fill=\"#a8a29e\">epoch</text>\n        </svg>\n        <p class=\"mechanism-text\"><strong>The pressure dies.</strong>\n        The self-model share of the hidden-layer gradient falls to\n        about 2% by epoch 20. Slow the head down and the effect comes\n        back.</p>\n      </div>\n    </div>\n    "
+            "text/plain": ""
           }
         }
       ],
@@ -397,6 +397,19 @@
     },
     {
       "id": "NCOB",
+      "code_hash": "7babce3ee24bb23eae54d9f9f000b9a9",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='pHFh-0' random-id='48a6a2d3-482e-d2b5-36e6-f1c65b396a59'><marimo-radio data-initial-value='&quot;3. both&quot;' data-label='&quot;&#92;u003cspan class=&#92;&quot;markdown prose dark:prose-invert contents&#92;&quot;&#92;u003e&#92;u003cspan class=&#92;&quot;paragraph&#92;&quot;&#92;u003eBuild the synthesis&#92;u003c/span&#92;u003e&#92;u003c/span&#92;u003e&quot;' data-options='[&quot;1. units&quot;,&quot;2. timing&quot;,&quot;3. both&quot;]' data-inline='true' data-disabled='false'></marimo-radio></marimo-ui-element><div class=\"mechanism-grid\"><div class=\"mechanism-card\">\n        <div class=\"mechanism-kicker\">CIFAR-10 \u00b7 units</div>\n        <svg class=\"mechanism-svg\" viewBox=\"0 0 280 150\"\n             role=\"img\"\n             aria-label=\"Hidden activations shrink while the classifier grows\">\n          <defs>\n            <marker id=\"mech-arrow\" viewBox=\"0 0 10 10\" refX=\"9\"\n                    refY=\"5\" markerWidth=\"5\" markerHeight=\"5\"\n                    orient=\"auto\">\n              <path d=\"M0,0 L10,5 L0,10 z\" fill=\"#a8a29e\"/>\n            </marker>\n          </defs>\n          <text x=\"44\" y=\"16\" text-anchor=\"middle\" font-size=\"10\"\n                fill=\"#78716c\">AW 0</text>\n          <text x=\"200\" y=\"16\" text-anchor=\"middle\" font-size=\"10\"\n                fill=\"#78716c\">AW 2</text>\n          <g opacity=\"0.85\">\n            <circle cx=\"30\" cy=\"50\" r=\"3.2\" fill=\"#1d4ed8\"/>\n            <circle cx=\"42\" cy=\"46\" r=\"3.2\" fill=\"#1d4ed8\"/>\n            <circle cx=\"52\" cy=\"56\" r=\"3.2\" fill=\"#1d4ed8\"/>\n            <circle cx=\"34\" cy=\"70\" r=\"3.2\" fill=\"#b45309\"/>\n            <circle cx=\"46\" cy=\"68\" r=\"3.2\" fill=\"#b45309\"/>\n            <circle cx=\"58\" cy=\"74\" r=\"3.2\" fill=\"#b45309\"/>\n            <circle cx=\"32\" cy=\"90\" r=\"3.2\" fill=\"#047857\"/>\n            <circle cx=\"44\" cy=\"92\" r=\"3.2\" fill=\"#047857\"/>\n            <circle cx=\"56\" cy=\"88\" r=\"3.2\" fill=\"#047857\"/>\n            <circle cx=\"192\" cy=\"64\" r=\"3.2\" fill=\"#1d4ed8\"/>\n            <circle cx=\"199\" cy=\"62\" r=\"3.2\" fill=\"#1d4ed8\"/>\n            <circle cx=\"206\" cy=\"68\" r=\"3.2\" fill=\"#1d4ed8\"/>\n            <circle cx=\"194\" cy=\"76\" r=\"3.2\" fill=\"#b45309\"/>\n            <circle cx=\"201\" cy=\"74\" r=\"3.2\" fill=\"#b45309\"/>\n            <circle cx=\"208\" cy=\"80\" r=\"3.2\" fill=\"#b45309\"/>\n            <circle cx=\"192\" cy=\"88\" r=\"3.2\" fill=\"#047857\"/>\n            <circle cx=\"199\" cy=\"90\" r=\"3.2\" fill=\"#047857\"/>\n            <circle cx=\"206\" cy=\"86\" r=\"3.2\" fill=\"#047857\"/>\n          </g>\n          <line x1=\"95\" y1=\"80\" x2=\"135\" y2=\"80\" stroke=\"#a8a29e\"\n                stroke-width=\"1.5\" marker-end=\"url(#mech-arrow)\"/>\n          <text x=\"115\" y=\"70\" text-anchor=\"middle\" font-size=\"9\"\n                fill=\"#78716c\">AW \u2191</text>\n          <rect x=\"30\" y=\"118\" width=\"40\" height=\"8\" rx=\"3\"\n                fill=\"#b45309\" opacity=\"0.8\"/>\n          <rect x=\"176\" y=\"118\" width=\"60\" height=\"8\" rx=\"3\"\n                fill=\"#b45309\" opacity=\"0.8\"/>\n          <text x=\"50\" y=\"140\" text-anchor=\"middle\" font-size=\"9\"\n                fill=\"#78716c\">|W| small</text>\n          <text x=\"206\" y=\"140\" text-anchor=\"middle\" font-size=\"9\"\n                fill=\"#78716c\">|W| grows</text>\n        </svg>\n        <p class=\"mechanism-text\"><strong>SD / |W| stays flat.</strong>\n        The activations shrink and the classifier grows to keep the\n        logits fixed. The wider SD is a units change, not a new\n        complexity.</p>\n      </div><div class=\"mechanism-card\">\n        <div class=\"mechanism-kicker\">IMDB \u00b7 timing</div>\n        <svg class=\"mechanism-svg\" viewBox=\"0 0 280 150\"\n             role=\"img\"\n             aria-label=\"Self-model gradient share falls to two percent by epoch twenty\">\n          <line x1=\"28\" y1=\"120\" x2=\"260\" y2=\"120\" stroke=\"#d6d3d1\"/>\n          <line x1=\"28\" y1=\"120\" x2=\"28\" y2=\"30\" stroke=\"#d6d3d1\"/>\n          <line x1=\"28\" y1=\"111\" x2=\"260\" y2=\"111\" stroke=\"#d6d3d1\"\n                stroke-dasharray=\"4 4\"/>\n          <text x=\"250\" y=\"107\" text-anchor=\"end\" font-size=\"9\"\n                fill=\"#a8a29e\">2%</text>\n          <polyline points=\"28,39 49,52 70,84 91,102 112,111 154,111 196,111 238,111\"\n                    fill=\"none\" stroke=\"#b45309\" stroke-width=\"3\"\n                    stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n          <circle cx=\"112\" cy=\"111\" r=\"3.5\" fill=\"#b45309\"/>\n          <text x=\"120\" y=\"96\" font-size=\"9\" fill=\"#78716c\">pressure dies</text>\n          <text x=\"28\" y=\"24\" font-size=\"9\" fill=\"#78716c\">self-model share</text>\n          <text x=\"28\" y=\"136\" font-size=\"9\" fill=\"#a8a29e\">0</text>\n          <text x=\"112\" y=\"136\" text-anchor=\"middle\" font-size=\"9\"\n                fill=\"#a8a29e\">20</text>\n          <text x=\"196\" y=\"136\" text-anchor=\"middle\" font-size=\"9\"\n                fill=\"#a8a29e\">40</text>\n          <text x=\"260\" y=\"136\" text-anchor=\"end\" font-size=\"9\"\n                fill=\"#a8a29e\">epoch</text>\n        </svg>\n        <p class=\"mechanism-text\"><strong>The pressure dies.</strong>\n        The self-model share of the hidden-layer gradient falls to\n        about 2% by epoch 20. Slow the head down and the effect comes\n        back.</p>\n      </div></div></div>"
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "aqbW",
       "code_hash": "2f90fbfab785f5d5d22d366fbc30096f",
       "outputs": [
         {
@@ -409,7 +422,7 @@
       "console": []
     },
     {
-      "id": "aqbW",
+      "id": "TRpd",
       "code_hash": "c2897895c1f3ca45228d6fa77989c75b",
       "outputs": [
         {
@@ -422,7 +435,7 @@
       "console": []
     },
     {
-      "id": "TRpd",
+      "id": "TXez",
       "code_hash": "a94b3fb1debc582279eab42d07ea94d3",
       "outputs": [
         {
@@ -435,7 +448,7 @@
       "console": []
     },
     {
-      "id": "TXez",
+      "id": "dNNg",
       "code_hash": "c2a5b9e7e2e3fa475e989d609f814de3",
       "outputs": [
         {
@@ -448,7 +461,7 @@
       "console": []
     },
     {
-      "id": "dNNg",
+      "id": "yCnT",
       "code_hash": "aaee28ade067d84bfa07d19b0aceafa9",
       "outputs": [
         {
@@ -461,7 +474,7 @@
       "console": []
     },
     {
-      "id": "yCnT",
+      "id": "wlCL",
       "code_hash": "7a2aa2404f46b82005c0a5472b269d31",
       "outputs": [
         {
