@@ -364,6 +364,10 @@ posts, not good essays.
 If the hero figure does not run in twenty minutes, the paper is a bigger
 project than a first pass. Say so early.
 
+## Visual references
+
+The [visual essay reference library](visual-essays/) collects 32 annotated examples, captured screenshots, and a pattern-to-marimo table. Start with the [gallery](visual-essays/index.html), then use the [interaction lab](visual-essays/recreations/index.html) when a chart is the wrong shape for the idea. The [capture tool](visual-essays/capture.py) makes the shelf extendable.
+
 ## Things I would do differently
 
 - Build the oracle and tests before the first essay cell. The

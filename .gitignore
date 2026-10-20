@@ -8,3 +8,7 @@ __pycache__/
 notebooks/*/outputs/
 notebooks/self-modeling/checkpoints/
 .cache/
+.playwright/
+.uv-cache/
+.uv-tools/
+.uv-bin/

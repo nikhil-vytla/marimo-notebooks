@@ -14,3 +14,5 @@ See [AGENTS.md](AGENTS.md) for layout and conventions. Use `just` for everything
 ## Method
 
 See [docs/ESSAY-PLAYBOOK.md](docs/ESSAY-PLAYBOOK.md) for choosing papers, the data contract, interaction patterns, the marimo capability ladder, and what to do next. See [docs/ESSAY-SHELL.md](docs/ESSAY-SHELL.md) for the reusable essay frame in [templates/essay.py](templates/essay.py).
+
+For a curated shelf of visual essays, captured screenshots, pattern notes, and interaction recreations, see [docs/visual-essays/](docs/visual-essays/). Open the [gallery](docs/visual-essays/index.html) or the [interaction lab](docs/visual-essays/recreations/index.html).

@@ -1,0 +1,694 @@
+{
+  "version": 1,
+  "updated": "2026-10-20",
+  "entries": [
+    {
+      "slug": "distill-momentum",
+      "title": "Why Momentum Really Works",
+      "site": "Distill",
+      "author": "Gabriel Goh",
+      "year": 2017,
+      "url": "https://distill.pub/2017/momentum/",
+      "topics": [
+        "optimization",
+        "interactive"
+      ],
+      "patterns": [
+        "direct-manipulation",
+        "parameter-sweep",
+        "annotated-diagram"
+      ],
+      "why": "Two sliders control a trajectory in a loss landscape, and the picture redraws immediately. The interaction is the explanation: you feel the difference between step size and momentum instead of reading a definition.",
+      "steal": "Put the two parameters that actually trade off next to one canvas. Draw the trajectory, the starting point, and the destination in the same frame. Label the control with the symbol the text uses.",
+      "marimo": "`mo.ui.slider` plus an Altair or anywidget canvas. Keep the state in Python and redraw the whole figure on each change.",
+      "capture": true
+    },
+    {
+      "slug": "distill-feature-viz",
+      "title": "Feature Visualization",
+      "site": "Distill",
+      "author": "Chris Olah, Alexander Mordvintsev, Ludwig Schubert",
+      "year": 2017,
+      "url": "https://distill.pub/2017/feature-visualization/",
+      "topics": [
+        "interpretability",
+        "vision"
+      ],
+      "patterns": [
+        "visual-atlas",
+        "small-multiples",
+        "progressive-construction"
+      ],
+      "why": "The article treats a network's features as a visual collection, not as a single summary number. The repeated image grid gives the reader a way to compare hundreds of features without a table.",
+      "steal": "Use a stable small-multiple grid with one visual grammar. Add zoom and a short annotation for the one tile that carries the point. Do not make every tile a different chart type.",
+      "marimo": "A CSS grid of `mo.image` or `mo.Html` tiles; a dropdown to switch layers; `mo.ui.anywidget` if the grid needs to be panned.",
+      "capture": true
+    },
+    {
+      "slug": "distill-building-blocks",
+      "title": "The Building Blocks of Interpretability",
+      "site": "Distill",
+      "author": "Chris Olah, Arvind Satyanarayan, Ian Johnson, Shan Carter, Ludwig Schubert, Katherine Ye, Alexander Mordvintsev",
+      "year": 2018,
+      "url": "https://distill.pub/2018/building-blocks/",
+      "topics": [
+        "interpretability",
+        "interface"
+      ],
+      "patterns": [
+        "linked-views",
+        "annotated-diagram",
+        "direct-manipulation"
+      ],
+      "why": "It shows how separate interpretability views become useful when they are linked: pick a feature, see where it fires, see the attribution, see the label. The interface is the argument for combining methods.",
+      "steal": "Coordinate two views with one selection. A click in the feature map should highlight the matching row in the attribution chart and the text snippet. Keep the selection visible in every panel.",
+      "marimo": "`mo.ui.altair_chart` selection plus a shared Python variable; or an anywidget that owns the linked state. Use `mo.ui.table` for the text rows.",
+      "capture": true
+    },
+    {
+      "slug": "distill-gnn-intro",
+      "title": "A Gentle Introduction to Graph Neural Networks",
+      "site": "Distill",
+      "author": "Benjamin Sanchez-Lengeling, Emily Reif, Adam Pearce, Alexander B. Wiltschko",
+      "year": 2021,
+      "url": "https://distill.pub/2021/gnn-intro/",
+      "topics": [
+        "graphs",
+        "deep learning"
+      ],
+      "patterns": [
+        "progressive-construction",
+        "annotated-diagram",
+        "small-multiples"
+      ],
+      "why": "The same graph drawing returns in every section, gaining one element at a time: nodes, edges, messages, pooling. The reader never has to rebuild the mental image.",
+      "steal": "Design one reusable diagram and mutate it across sections. Keep the layout fixed so the new part is obvious. Put the equation next to the picture, not in a separate block.",
+      "marimo": "One `mo.Html` SVG function with parameters for the visible parts; call it with a different boolean per section.",
+      "capture": true
+    },
+    {
+      "slug": "transformer-circuits-framework",
+      "title": "A Mathematical Framework for Transformer Circuits",
+      "site": "Transformer Circuits",
+      "author": "Nelson Elhage, Neel Nanda, Catherine Olsson, et al.",
+      "year": 2021,
+      "url": "https://transformer-circuits.pub/2021/framework/index.html",
+      "topics": [
+        "transformers",
+        "interpretability",
+        "math"
+      ],
+      "patterns": [
+        "annotated-diagram",
+        "progressive-construction",
+        "linked-views"
+      ],
+      "why": "The tensor diagrams are a grammar, not decoration. The same shapes and arrows recur until the reader can read a circuit from the picture and check it against the equation.",
+      "steal": "Invent a small visual vocabulary (residual stream as a line, heads as matrices, paths as arrows) and use it unchanged for the whole essay. Hover or click should reveal the matching term.",
+      "marimo": "`mo.Html` SVG with `<title>` tooltips and CSS hover; a shared Python function that draws the circuit from a small graph spec.",
+      "capture": true,
+      "scroll_y": 30400
+    },
+    {
+      "slug": "transformer-circuits-toy-models",
+      "title": "Toy Models of Superposition",
+      "site": "Transformer Circuits",
+      "author": "Nelson Elhage, Tristan Hume, Catherine Olsson, et al.",
+      "year": 2022,
+      "url": "https://transformer-circuits.pub/2022/toy_model/index.html",
+      "topics": [
+        "interpretability",
+        "representation"
+      ],
+      "patterns": [
+        "phase-diagram",
+        "small-multiples",
+        "annotated-diagram"
+      ],
+      "why": "A single geometric picture carries the thesis: features crowd into dimensions, and the phase diagram makes the regimes visible. The reader can see why the result is not a single lucky run.",
+      "steal": "If the argument has regimes, draw the regime map. Annotate the boundary, not every point. Pair the map with one concrete example from each side.",
+      "marimo": "Altair heatmap or `mo.Html` canvas for the phase diagram; a click selects a cell and redraws the corresponding toy example.",
+      "capture": true
+    },
+    {
+      "slug": "transformer-circuits-biology",
+      "title": "On the Biology of a Large Language Model",
+      "site": "Transformer Circuits",
+      "author": "Anthropic Interpretability Team",
+      "year": 2025,
+      "url": "https://transformer-circuits.pub/2025/attribution-graphs/biology.html",
+      "topics": [
+        "interpretability",
+        "language models"
+      ],
+      "patterns": [
+        "annotated-diagram",
+        "graph-layout",
+        "linked-views"
+      ],
+      "why": "Attribution graphs read left to right like a computation, with feature families color-coded and examples attached. It is the clearest recent example of a custom visual grammar for model internals.",
+      "steal": "Lay out a computation as a directed graph with a consistent reading direction. Use color for role, not for rank. Let the reader click a node to see the text that activates it.",
+      "marimo": "An anywidget with a graph layout; or a static SVG generated from a JSON graph with hover annotations.",
+      "capture": false
+    },
+    {
+      "slug": "lilian-attention",
+      "title": "Attention? Attention!",
+      "site": "Lilian Weng",
+      "author": "Lilian Weng",
+      "year": 2018,
+      "url": "https://lilianweng.github.io/posts/2018-06-24-attention/",
+      "topics": [
+        "attention",
+        "deep learning",
+        "survey"
+      ],
+      "patterns": [
+        "long-form",
+        "taxonomy",
+        "annotated-diagram"
+      ],
+      "why": "A dense literature is organized into a family tree of variants, with consistent notation and a diagram for each mechanism. The hierarchy does most of the teaching.",
+      "steal": "Open with a taxonomy figure and reuse it as the section map. Keep one notation table and refer back to it. Put the variant's one-line difference under every diagram.",
+      "marimo": "`mo.md` sections, a reusable notation table, and `mo.Html` for the taxonomy tree. Use anchors for the long-form navigation.",
+      "capture": true,
+      "scroll_y": 900
+    },
+    {
+      "slug": "lilian-agents",
+      "title": "LLM Powered Autonomous Agents",
+      "site": "Lilian Weng",
+      "author": "Lilian Weng",
+      "year": 2023,
+      "url": "https://lilianweng.github.io/posts/2023-06-23-agent/",
+      "topics": [
+        "agents",
+        "language models",
+        "systems"
+      ],
+      "patterns": [
+        "long-form",
+        "system-diagram",
+        "taxonomy"
+      ],
+      "why": "The canonical agent architecture diagram is simple enough to remember and detailed enough to organize the whole post. It turns a sprawling topic into four boxes and their loops.",
+      "steal": "Draw the system once, then use its parts as the section headings. Keep the diagram at the top of every section, with the current part highlighted.",
+      "marimo": "One `mo.Html` SVG with a `highlight` parameter; section cells pass the relevant part.",
+      "capture": true,
+      "scroll_y": 500
+    },
+    {
+      "slug": "nan-database",
+      "title": "Build Your Own Database",
+      "site": "NaN (nan.fyi)",
+      "author": "Nanda Syahrasyad",
+      "year": 2024,
+      "url": "https://www.nan.fyi/database",
+      "topics": [
+        "databases",
+        "systems",
+        "tutorial"
+      ],
+      "patterns": [
+        "progressive-construction",
+        "stateful-diagram",
+        "direct-manipulation"
+      ],
+      "why": "The reader builds a key-value store from a file, then watches segments compact and indices update. The persistent artifact changes under the reader's clicks, which makes the invariants concrete.",
+      "steal": "Give the reader a small artifact they can mutate. Show the before and after state in the same frame. Put the problem statement before the mechanism, then let the reader press the button that resolves it.",
+      "marimo": "`mo.ui.button` plus a Python state object; render the artifact as `mo.Html`. Use `mo.ui.run_button` only for expensive work.",
+      "capture": true,
+      "scroll_y": 1250
+    },
+    {
+      "slug": "ciechanowski-gears",
+      "title": "Gears",
+      "site": "Bartosz Ciechanowski",
+      "author": "Bartosz Ciechanowski",
+      "year": 2019,
+      "url": "https://ciechanow.ski/gears/",
+      "topics": [
+        "mechanics",
+        "physics"
+      ],
+      "patterns": [
+        "3d-spatial",
+        "direct-manipulation",
+        "progressive-construction"
+      ],
+      "why": "The reader drags gears, changes teeth, and watches the mechanism fail or mesh. The page is a sequence of small physical experiments, not a sequence of paragraphs.",
+      "steal": "Start with one moving part and add one constraint at a time. Use motion trails, force arrows, and a reset button. Let the reader break the mechanism safely.",
+      "marimo": "An anywidget with a canvas or WebGL renderer; `mo.ui.slider` for the parameters. Keep the simulation loop in JS and sync only the control values.",
+      "capture": true
+    },
+    {
+      "slug": "ciechanowski-moon",
+      "title": "Moon",
+      "site": "Bartosz Ciechanowski",
+      "author": "Bartosz Ciechanowski",
+      "year": 2024,
+      "url": "https://ciechanow.ski/moon/",
+      "topics": [
+        "astronomy",
+        "physics"
+      ],
+      "patterns": [
+        "3d-spatial",
+        "timeline",
+        "progressive-construction"
+      ],
+      "why": "A complex spatial system is made readable by keeping the camera under the reader's control and explaining one frame at a time. The timeline scrubber turns an orbit into something you can inspect.",
+      "steal": "When time matters, give the reader a scrubber. When space matters, give them a camera. Keep the explanatory overlay in screen space so it stays readable while the world moves.",
+      "marimo": "An anywidget with Three.js; expose time and camera as traits. Use a separate 2D SVG inset for the diagram that must stay legible.",
+      "capture": false
+    },
+    {
+      "slug": "setosa-pca",
+      "title": "Principal Component Analysis",
+      "site": "Explained Visually (Setosa)",
+      "author": "Victor Powell, Lewis Lehe",
+      "year": 2015,
+      "url": "https://setosa.io/ev/principal-component-analysis/",
+      "topics": [
+        "linear algebra",
+        "statistics"
+      ],
+      "patterns": [
+        "direct-manipulation",
+        "linked-views",
+        "annotated-diagram"
+      ],
+      "why": "The reader drags a point cloud and watches the principal axes and the projection change. One interaction carries the whole idea of variance maximization.",
+      "steal": "One draggable object, one derived quantity, one immediate redraw. Put the numerical readout next to the visual, not in a separate panel.",
+      "marimo": "`mo.ui.anywidget` canvas with pointer events, or `mo.ui.altair_chart` selection if the points are a Vega dataset. A slider is a weaker substitute for direct dragging.",
+      "capture": false,
+      "scroll_y": 3400
+    },
+    {
+      "slug": "setosa-markov",
+      "title": "Markov Chains",
+      "site": "Explained Visually (Setosa)",
+      "author": "Victor Powell, Lewis Lehe",
+      "year": 2014,
+      "url": "https://setosa.io/ev/markov-chains/",
+      "topics": [
+        "probability",
+        "linear algebra"
+      ],
+      "patterns": [
+        "linked-views",
+        "direct-manipulation",
+        "annotated-diagram"
+      ],
+      "why": "The state diagram and the transition matrix are linked. Clicking a state highlights the corresponding row, so the matrix stops being an arbitrary grid.",
+      "steal": "Link the symbolic view to the spatial view. A selection in one should be visible in the other without a legend.",
+      "marimo": "A shared selection variable between an SVG state diagram and a styled HTML table or Altair heatmap.",
+      "capture": true
+    },
+    {
+      "slug": "r2d3-ml",
+      "title": "A Visual Introduction to Machine Learning",
+      "site": "R2D3",
+      "author": "Stephanie Yee, Tony Chu",
+      "year": 2015,
+      "url": "https://r2d3.us/visual-intro-to-machine-learning-part-1/",
+      "topics": [
+        "machine learning",
+        "scrollytelling"
+      ],
+      "patterns": [
+        "scrollytelling",
+        "sticky-figure",
+        "progressive-construction"
+      ],
+      "why": "The visualization stays fixed while the text adds one split, then another. The reader's scroll becomes the model's training step.",
+      "steal": "Use a sticky figure and short steps. Each step should change exactly one thing in the figure. Do not make the reader scroll back to compare.",
+      "marimo": "CSS `position: sticky` around an `mo.Html` figure, with `mo.md` steps; or a single anywidget that reads a step index from a slider. Marimo's layout does not give you scroll progress for free.",
+      "capture": true
+    },
+    {
+      "slug": "nicky-polygons",
+      "title": "Parable of the Polygons",
+      "site": "Nicky Case",
+      "author": "Vi Hart, Nicky Case",
+      "year": 2014,
+      "url": "https://ncase.me/polygons/",
+      "topics": [
+        "segregation",
+        "social science",
+        "simulation"
+      ],
+      "patterns": [
+        "playable-simulation",
+        "direct-manipulation",
+        "moral-argument"
+      ],
+      "why": "The reader sets a tiny individual preference and watches segregation emerge. The mechanic is the argument, so the conclusion lands without a paragraph of exposition.",
+      "steal": "If the claim is about a feedback loop, let the reader set the loop's parameter and run it. Show the aggregate consequence next to the individual rule.",
+      "marimo": "A small Python simulation with `mo.ui.slider` and a redraw; for smooth animation, an anywidget. Keep the run button explicit so the reader can compare settings.",
+      "capture": true
+    },
+    {
+      "slug": "nicky-trust",
+      "title": "The Evolution of Trust",
+      "site": "Nicky Case",
+      "author": "Nicky Case",
+      "year": 2017,
+      "url": "https://ncase.me/trust/",
+      "topics": [
+        "game theory",
+        "cooperation"
+      ],
+      "patterns": [
+        "playable-simulation",
+        "repeated-game",
+        "progressive-construction"
+      ],
+      "why": "The reader plays a repeated prisoner's dilemma, then sees the strategies compete. The payoff matrix becomes a lived experience, not a table to memorize.",
+      "steal": "Make the reader choose once before showing the equilibrium. Reveal the aggregate after the choice, then let them replay with a different rule.",
+      "marimo": "A state machine in Python with `mo.ui.button` choices and a small history table; an anywidget if the animation matters.",
+      "capture": false,
+      "scroll_y": 620
+    },
+    {
+      "slug": "bret-victor-explorable",
+      "title": "Explorable Explanations",
+      "site": "Bret Victor",
+      "author": "Bret Victor",
+      "year": 2011,
+      "url": "http://worrydream.com/ExplorableExplanations/",
+      "topics": [
+        "essay",
+        "interaction design"
+      ],
+      "patterns": [
+        "manifesto",
+        "direct-manipulation"
+      ],
+      "why": "The founding argument for the genre: the reader should be able to act, not just read. It is useful as a design stance even when the visuals are simple.",
+      "steal": "Ask what the reader should be able to try. If the answer is nothing, the essay may not need interaction. If it is one thing, build that one thing well.",
+      "marimo": "No special widget. Use it as a review question before adding controls.",
+      "capture": true
+    },
+    {
+      "slug": "bret-victor-ladder",
+      "title": "Up and Down the Ladder of Abstraction",
+      "site": "Bret Victor",
+      "author": "Bret Victor",
+      "year": 2011,
+      "url": "https://worrydream.com/LadderOfAbstraction/",
+      "topics": [
+        "systems",
+        "visualization"
+      ],
+      "patterns": [
+        "linked-views",
+        "multiple-representations",
+        "direct-manipulation"
+      ],
+      "why": "The same system is shown at several levels, from a concrete trajectory to an abstract field. The reader can move between representations without losing the object.",
+      "steal": "If you have several representations, link them to the same underlying state and let the reader switch. Do not present them as separate figures with separate data.",
+      "marimo": "A shared state object and a `mo.ui.radio` or tabs for the representation; render each with `mo.Html` or Altair from the same data.",
+      "capture": false
+    },
+    {
+      "slug": "explorables-all",
+      "title": "Explorable Explanations: all entries",
+      "site": "Explorable Explanations",
+      "author": "Nicky Case and contributors",
+      "year": 2026,
+      "url": "https://explorabl.es/all/",
+      "topics": [
+        "index",
+        "interaction design"
+      ],
+      "patterns": [
+        "gallery",
+        "curation"
+      ],
+      "why": "The best single index of the genre, with 180 entries across math, physics, biology, civics, and journalism. Use it to find a mechanic, not to copy a page.",
+      "steal": "Browse by mechanic (drag, play, build, compare) rather than by topic. Pick one mechanic you have not used and adapt it to your argument.",
+      "marimo": "A curated `mo.ui.table` or gallery notebook with tags and links; do not try to embed the whole index.",
+      "capture": true
+    },
+    {
+      "slug": "seeing-theory",
+      "title": "Seeing Theory",
+      "site": "Brown University",
+      "author": "Daniel Kunin, Jingru Guo, Tyler Dae Devlin, Daniel Xiang",
+      "year": 2016,
+      "url": "https://seeing-theory.brown.edu/",
+      "topics": [
+        "probability",
+        "statistics",
+        "textbook"
+      ],
+      "patterns": [
+        "interactive-textbook",
+        "small-multiples",
+        "direct-manipulation"
+      ],
+      "why": "A sequence of small, focused probability interactions. Each chapter has one visual idea and one thing to try, which keeps the cognitive load low.",
+      "steal": "One interaction per concept. Put the instruction next to the control and make the expected observation explicit.",
+      "marimo": "One `mo.ui.slider` or `mo.ui.button` per section, with a compact Altair or SVG figure. Avoid a control panel that changes everything at once.",
+      "capture": true
+    },
+    {
+      "slug": "immersive-math",
+      "title": "Immersive Math",
+      "site": "Immersive Math",
+      "author": "Jacob Str\u00f6m, Kalle \u00c5str\u00f6m, Tomas Akenine-M\u00f6ller",
+      "year": 2017,
+      "url": "https://immersivemath.com/ila/index.html",
+      "topics": [
+        "linear algebra",
+        "textbook"
+      ],
+      "patterns": [
+        "interactive-textbook",
+        "linked-views",
+        "3d-spatial"
+      ],
+      "why": "Every equation has a figure you can manipulate, and the figure updates the equation. The link between notation and geometry is the whole design.",
+      "steal": "Pair each equation with a direct manipulation of its terms. When the reader changes a vector, show the numeric change in the equation immediately.",
+      "marimo": "`mo.ui.slider` or anywidget for the geometry; render the equation with `mo.md` and update the numbers from the same state.",
+      "capture": true
+    },
+    {
+      "slug": "book-of-shaders",
+      "title": "The Book of Shaders",
+      "site": "The Book of Shaders",
+      "author": "Patricio Gonzalez Vivo, Jen Lowe",
+      "year": 2015,
+      "url": "https://thebookofshaders.com/03/",
+      "topics": [
+        "shaders",
+        "graphics",
+        "tutorial"
+      ],
+      "patterns": [
+        "live-code",
+        "progressive-construction",
+        "direct-manipulation"
+      ],
+      "why": "Every concept is a runnable shader with an editable code panel. The feedback loop is immediate, so the reader learns the language by changing it.",
+      "steal": "If you are teaching a visual language, put the code and the canvas side by side. Make the smallest possible edit the reader can try. Keep the default output interesting before they touch it.",
+      "marimo": "An anywidget with a WebGL canvas and a textarea, or `mo.ui.code_editor` plus a JS renderer. Sync only on run, not on every keystroke.",
+      "capture": false,
+      "scroll_y": 0
+    },
+    {
+      "slug": "maxime-heckel-shaders",
+      "title": "Beautiful and mind-bending effects with WebGL Render Targets",
+      "site": "Maxime Heckel",
+      "author": "Maxime Heckel",
+      "year": 2021,
+      "url": "https://blog.maximeheckel.com/posts/beautiful-and-mind-bending-effects-with-webgl-render-targets/",
+      "topics": [
+        "shaders",
+        "three.js",
+        "graphics"
+      ],
+      "patterns": [
+        "live-code",
+        "3d-spatial",
+        "art-directed"
+      ],
+      "why": "A technical post with an art-directed hero, live shader demos, and code that matches the visuals. It treats the visual as part of the argument, not as a screenshot after the fact.",
+      "steal": "Build the hero visual from the same primitives the post teaches. Keep the palette and typography consistent between the page and the canvas.",
+      "marimo": "An anywidget with Three.js loaded from a CDN; keep the shader source in Python and pass it as a trait so the notebook owns the code.",
+      "capture": true,
+      "scroll_y": 5600
+    },
+    {
+      "slug": "threejs-examples",
+      "title": "Three.js Examples",
+      "site": "Three.js",
+      "author": "Three.js contributors",
+      "year": 2026,
+      "url": "https://threejs.org/examples/",
+      "topics": [
+        "3d",
+        "graphics",
+        "reference"
+      ],
+      "patterns": [
+        "3d-spatial",
+        "gallery"
+      ],
+      "why": "A working catalog of 3D interaction primitives: orbit controls, instancing, postprocessing, physics, and shader materials. It is a parts bin, not an essay.",
+      "steal": "Borrow one primitive at a time. The examples are deliberately isolated, which makes them easy to lift into a notebook.",
+      "marimo": "An anywidget bundle with Three.js; do not load the whole examples catalog. Copy the minimal setup for the one feature you need.",
+      "capture": false
+    },
+    {
+      "slug": "webgpu-samples",
+      "title": "WebGPU Samples",
+      "site": "WebGPU",
+      "author": "WebGPU contributors",
+      "year": 2026,
+      "url": "https://webgpu.github.io/webgpu-samples/",
+      "topics": [
+        "webgpu",
+        "graphics",
+        "compute"
+      ],
+      "patterns": [
+        "3d-spatial",
+        "live-code",
+        "gallery"
+      ],
+      "why": "The current reference for browser-native GPU work, with render and compute examples. Use it when the computation itself is the visual, not for a static chart.",
+      "steal": "Start from the smallest triangle or compute pass. Add one buffer at a time. Keep a fallback path for browsers without WebGPU.",
+      "marimo": "An anywidget with a WebGPU canvas; feature-detect `navigator.gpu` and show a static fallback. Keep the WGSL in a separate string for readability.",
+      "capture": false
+    },
+    {
+      "slug": "pudding-waveforms",
+      "title": "Let's Learn About Waveforms",
+      "site": "The Pudding",
+      "author": "Josh Comeau",
+      "year": 2018,
+      "url": "https://pudding.cool/2018/02/waveforms/",
+      "topics": [
+        "audio",
+        "physics",
+        "scrollytelling"
+      ],
+      "patterns": [
+        "audio-visual",
+        "scrollytelling",
+        "direct-manipulation"
+      ],
+      "why": "Sound and image are tied together: press play and the waveform moves. The reader can hear the thing the text is describing.",
+      "steal": "If the subject has a time-based signal, add a play button and animate the same diagram. Do not use audio as decoration; make it the thing under study.",
+      "marimo": "`mo.ui.audio` or an anywidget with the Web Audio API; animate a canvas from the analyser data. Always provide a pause and a reduced-motion path.",
+      "capture": true
+    },
+    {
+      "slug": "ink-switch-local-first",
+      "title": "Local-first software",
+      "site": "Ink & Switch",
+      "author": "Martin Kleppmann, Adam Wiggins, Peter van Hardenberg, Mark McGranaghan",
+      "year": 2019,
+      "url": "https://www.inkandswitch.com/local-first/",
+      "topics": [
+        "software",
+        "research essay"
+      ],
+      "patterns": [
+        "thesis-principles",
+        "prototype-as-evidence",
+        "annotated-diagram"
+      ],
+      "why": "A research essay that pairs each principle with a prototype or a concrete scenario. The design claims are tested against artifacts, not only argued.",
+      "steal": "State the thesis, then give each principle a small demo or a worked example. End with the cases where the thesis fails.",
+      "marimo": "A section per principle, each with a small `mo.ui` demo or a data-backed figure. Use the same layout for every principle so the comparison is easy.",
+      "capture": true
+    },
+    {
+      "slug": "observable-algorithms",
+      "title": "Visualizing Algorithms",
+      "site": "Mike Bostock",
+      "author": "Mike Bostock",
+      "year": 2014,
+      "url": "https://bost.ocks.org/mike/algorithms/",
+      "topics": [
+        "algorithms",
+        "visualization"
+      ],
+      "patterns": [
+        "animated-process",
+        "direct-manipulation",
+        "small-multiples"
+      ],
+      "why": "Algorithms are shown as processes with state you can inspect. The animation is not decoration; it is the execution trace.",
+      "steal": "Expose the state that changes, not just the final output. Add play, pause, and step. Keep the trace visible after the animation ends.",
+      "marimo": "An anywidget with a step function and a play loop; or a Python generator advanced by `mo.ui.button`. Use `mo.status.progress_bar` only for long computations.",
+      "capture": true
+    },
+    {
+      "slug": "colah-lstm",
+      "title": "Understanding LSTM Networks",
+      "site": "colah's blog",
+      "author": "Christopher Olah",
+      "year": 2015,
+      "url": "https://colah.github.io/posts/2015-08-Understanding-LSTMs/",
+      "topics": [
+        "recurrent networks",
+        "deep learning"
+      ],
+      "patterns": [
+        "annotated-diagram",
+        "progressive-construction"
+      ],
+      "why": "The diagrams are built from a tiny set of visual primitives (lines, boxes, circles) and repeated until the reader can read the network. The notation is the teaching.",
+      "steal": "Define the visual primitives once, then reuse them. Add one gate at a time and label the operation, not the whole diagram.",
+      "marimo": "A reusable `mo.Html` SVG function with primitives; `mo.md` prose between figures. No interaction required if the diagram sequence is strong.",
+      "capture": true
+    },
+    {
+      "slug": "alammar-transformer",
+      "title": "The Illustrated Transformer",
+      "site": "Jay Alammar",
+      "author": "Jay Alammar",
+      "year": 2018,
+      "url": "https://jalammar.github.io/illustrated-transformer/",
+      "topics": [
+        "transformers",
+        "deep learning"
+      ],
+      "patterns": [
+        "annotated-diagram",
+        "progressive-construction",
+        "small-multiples"
+      ],
+      "why": "A complex architecture is introduced as a sequence of matrices and arrows, with each step isolated. The visual sequence is the reader's working memory.",
+      "steal": "Show one matrix operation per figure. Keep the same token colors across the whole essay so the reader can track a token through the pipeline.",
+      "marimo": "`mo.Html` with a token color map in Python; render each step from the same data. A slider can scrub the sequence if it gets long.",
+      "capture": true,
+      "scroll_y": 1000
+    },
+    {
+      "slug": "ciechanowski-cameras",
+      "title": "Cameras and Lenses",
+      "site": "Bartosz Ciechanowski",
+      "author": "Bartosz Ciechanowski",
+      "year": 2019,
+      "url": "https://ciechanow.ski/cameras-and-lenses/",
+      "topics": [
+        "optics",
+        "physics"
+      ],
+      "patterns": [
+        "3d-spatial",
+        "direct-manipulation",
+        "progressive-construction"
+      ],
+      "why": "The reader moves a lens, changes its focal length, and sees the image form. The page turns an optical bench into a toy that can be manipulated.",
+      "steal": "Give the reader a physical handle for the one variable that matters, and redraw the ray diagram immediately. Keep the labels in screen space so they stay legible while the geometry moves.",
+      "marimo": "An anywidget with a canvas or WebGL renderer; sliders for focal length and aperture. Sync only the controls and redraw in JS.",
+      "capture": true
+    }
+  ]
+}
