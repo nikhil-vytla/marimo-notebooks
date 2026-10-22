@@ -228,6 +228,47 @@ def _(mo):
           color: #57534e;
         }
         .mechanism-text strong { color: var(--ink); }
+        .protocol-check {
+          margin: 1.2rem 0 0;
+          border-top: 1px solid var(--line);
+          padding-top: 0.8rem;
+        }
+        .protocol-check summary {
+          cursor: pointer;
+          font: 650 0.72rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: var(--muted);
+        }
+        .protocol-check summary:hover { color: var(--accent); }
+        .protocol-check[open] summary { margin-bottom: 0.7rem; }
+        .protocol-body {
+          font-size: 0.9rem;
+          line-height: 1.55;
+          color: #57534e;
+        }
+        .protocol-body p { margin: 0.6rem 0; }
+        .protocol-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin: 0.8rem 0;
+          font-size: 0.82rem;
+          font-variant-numeric: tabular-nums;
+        }
+        .protocol-table th,
+        .protocol-table td {
+          text-align: right;
+          padding: 0.35rem 0.4rem;
+          border-bottom: 1px solid var(--line);
+        }
+        .protocol-table th:first-child,
+        .protocol-table td:first-child { text-align: left; }
+        .protocol-table th {
+          font: 650 0.66rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          color: var(--muted);
+        }
         .figure-caption {
           font-size: 0.8rem;
           line-height: 1.45;
@@ -1798,7 +1839,7 @@ def _(json, mo, pd):
 
 
 @app.cell(hide_code=True)
-def _(CIFAR_SKIP, CIFAR_SKIP_B64, alt, mo):
+def _(CIFAR_SKIP, alt, mo):
     _order = ["AW=0", "AW=2"]
     _scale = alt.Scale(
         domain=["standard ResNet-18", "block-3 skip"],
@@ -1861,33 +1902,12 @@ def _(CIFAR_SKIP, CIFAR_SKIP_B64, alt, mo):
         'the level but not the ordering. Lines are means over two seeds; '
         'bands are 95% CIs. At 150 epochs, batch 512. The paper reports '
         'the opposite ordering: the baseline is widest and self-modeling '
-        'narrows it. The batch-64 probe is in Table 1. Source: '
+        'narrows it. The batch-64 probe is in the protocol check below. '
         '<code>cifar_skip.json</code>; script: '
         '<code>scripts/cifar_skip_experiment.py</code>.</p>'
     )
 
-    _pivot = CIFAR_SKIP_B64.pivot(
-        index="mode", columns="aw", values="mean"
-    )
-    _acc = CIFAR_SKIP_B64.groupby("mode")["acc"].mean()
-    _lines = [
-        "| model | AW 0 | AW 2 | accuracy |",
-        "| --- | ---: | ---: | ---: |",
-    ]
-    _short = {"standard ResNet-18": "standard", "spatial skip": "spatial"}
-    for _mode in ["standard ResNet-18", "spatial skip"]:
-        _lines.append(
-            f"| {_short[_mode]} | {_pivot.loc[_mode, 'AW=0']:.4f} | "
-            f"{_pivot.loc[_mode, 'AW=2']:.4f} | "
-            f"{_acc.loc[_mode]:.3f} |"
-        )
-    _table = mo.md(
-        "**Table 1. The batch-64 probe.** One seed, 75 epochs. At the "
-        "paper's batch size the absolute SD is higher, but the ordering "
-        "is still inverted. Source: `cifar_skip.json`.\n\n"
-        + "\n".join(_lines)
-    )
-    mo.vstack([_chart, _caption, _table])
+    mo.vstack([_chart, _caption])
     return
 
 
@@ -1899,19 +1919,58 @@ def _(mo):
     The block-3 model goes from **0.0321** to **0.0402**. The skip
     lowers the absolute SD, but the self-modeling run is still wider.
 
-    We also ran the paper's batch size. At batch 64 we used a spatial
-    skip: concatenate block 3 with an upsampled block 4, fuse them with
-    a 1x1 convolution to 512, then pool. At 75 epochs, the standard
-    model goes from **0.0759** to **0.1001**; the spatial skip goes from
-    **0.1050** to **0.1101**. The absolute SD is much higher, and the
-    ordering is still inverted.
+    The CIFAR inversion survives the obvious architectural fix. The
+    protocol check has the batch-64 numbers and the caveats.
+    """)
+    return
 
-    The block-3 intervals do not overlap. The standard run's two-seed
-    intervals do, so read that arm as a sign rather than a measurement.
-    The batch-64 probe is one seed. The paper uses 150 epochs and does
-    not pin down the skip placement. Both skip placements fail to flip
-    the ordering. This is a negative result for the obvious
-    architectural fix, not a proof that no implementation would work.
+
+@app.cell(hide_code=True)
+def _(CIFAR_SKIP_B64, mo):
+    _pivot = CIFAR_SKIP_B64.pivot(
+        index="mode", columns="aw", values="mean"
+    )
+    _acc = CIFAR_SKIP_B64.groupby("mode")["acc"].mean()
+    _short = {"standard ResNet-18": "standard", "spatial skip": "spatial"}
+    _rows = []
+    for _mode in ["standard ResNet-18", "spatial skip"]:
+        _rows.append(
+            f"<tr><td>{_short[_mode]}</td>"
+            f"<td>{_pivot.loc[_mode, 'AW=0']:.4f}</td>"
+            f"<td>{_pivot.loc[_mode, 'AW=2']:.4f}</td>"
+            f"<td>{_acc.loc[_mode]:.3f}</td></tr>"
+        )
+    _table = (
+        '<table class="protocol-table">'
+        "<thead><tr><th>model</th><th>AW 0</th><th>AW 2</th>"
+        "<th>accuracy</th></tr></thead>"
+        f"<tbody>{''.join(_rows)}</tbody></table>"
+    )
+    mo.Html(f"""
+    <details class="protocol-check">
+      <summary>Protocol check: batch 64, intervals, caveats</summary>
+      <div class="protocol-body">
+        <p>At batch 64 we used a spatial skip: concatenate block 3 with
+        an upsampled block 4, fuse them with a 1x1 convolution to 512,
+        then pool. At 75 epochs, the standard model goes from
+        <strong>0.0759</strong> to <strong>0.1001</strong>; the spatial
+        skip goes from <strong>0.1050</strong> to <strong>0.1101</strong>.
+        The absolute SD is much higher, and the ordering is still
+        inverted.</p>
+        {_table}
+        <p class="figure-caption">Table 1. The batch-64 probe. One seed,
+        75 epochs. At the paper's batch size the absolute SD is higher,
+        but the ordering is still inverted. Source:
+        <code>cifar_skip.json</code>.</p>
+        <p>The block-3 intervals do not overlap. The standard run's
+        two-seed intervals do, so read that arm as a sign rather than a
+        measurement. The batch-64 probe is one seed. The paper uses 150
+        epochs and does not pin down the skip placement. Both skip
+        placements fail to flip the ordering. This is a negative result
+        for the obvious architectural fix, not a proof that no
+        implementation would work.</p>
+      </div>
+    </details>
     """)
     return
 
