@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Visual essay reference library</title>
+<style>
+  :root {
+    --paper: #f6f2ea;
+    --card: #fffdf8;
+    --ink: #292524;
+    --muted: #78716c;
+    --line: #e7e0d4;
+    --accent: #b45309;
+    --accent-soft: #fdf0df;
+    --blue: #1d4ed8;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.55;
+  }
+  a { color: var(--blue); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:hover { color: var(--accent); }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+  header.hero { padding: 64px 0 34px; border-bottom: 1px solid var(--line); }
+  .eyebrow {
+    font: 650 0.72rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent);
+  }
+  h1 {
+    font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    font-weight: 600; font-size: clamp(2.4rem, 5vw, 4.4rem);
+    line-height: 1.02; letter-spacing: -0.025em; margin: 12px 0 18px;
+    max-width: 15ch;
+  }
+  .lede { max-width: 66ch; font-size: 1.13rem; color: #44403c; margin: 0 0 24px; }
+  nav.top { display: flex; gap: 18px; flex-wrap: wrap; font-size: 0.86rem; padding: 18px 0; }
+  nav.top a { color: var(--muted); text-decoration: none; }
+  nav.top a:hover { color: var(--accent); }
+  .stats { display: flex; gap: 28px; flex-wrap: wrap; padding: 26px 0 10px; }
+  .stat strong { display: block; font-family: "Iowan Old Style", Georgia, serif; font-size: 1.7rem; line-height: 1; }
+  .stat span { font-size: 0.76rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+  .controls {
+    position: sticky; top: 0; z-index: 5; background: rgba(246,242,234,0.94);
+    backdrop-filter: blur(10px); border-bottom: 1px solid var(--line);
+    padding: 14px 0; margin-bottom: 24px;
+  }
+  .controls .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  label.field { display: flex; flex-direction: column; gap: 4px; font-size: 0.67rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+  input[type="search"], select {
+    font: inherit; font-size: 0.9rem; color: var(--ink); background: var(--card);
+    border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-width: 170px;
+  }
+  input[type="search"]:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .count { margin-left: auto; font-size: 0.8rem; color: var(--muted); }
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 18px; padding-bottom: 54px; }
+  @media (max-width: 820px) { .grid { grid-template-columns: 1fr; } h1 { max-width: 100%; } }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    overflow: hidden; display: flex; flex-direction: column; min-width: 0;
+  }
+  .shot { aspect-ratio: 16 / 10; background: #e7e0d4; overflow: hidden; display: block; }
+  .shot img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
+  .fallback {
+    width: 100%; height: 100%; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 6px; padding: 18px;
+    text-align: center;
+    background: radial-gradient(circle at 20% 20%, #fdf0df 0%, #f3e7d3 52%, #e7dcc9 100%);
+  }
+  .fallback span {
+    font-family: "Iowan Old Style", Georgia, serif; font-size: 1.5rem;
+    line-height: 1.05; color: #57534e;
+  }
+  .fallback small {
+    font: 650 0.64rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: 0.1em; text-transform: uppercase; color: #92400e;
+  }
+  .card-body { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 10px; }
+  .meta { display: flex; gap: 8px; align-items: center; font: 600 0.68rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  .meta .site { color: var(--accent); }
+  .card h2 { font-family: "Iowan Old Style", Georgia, serif; font-size: 1.36rem; line-height: 1.15; margin: 0; letter-spacing: -0.01em; }
+  .card h2 a { color: var(--ink); text-decoration: none; }
+  .card h2 a:hover { color: var(--accent); }
+  .why { margin: 0; color: #44403c; font-size: 0.91rem; }
+  .steal { border-left: 3px solid var(--accent); padding: 2px 0 2px 10px; font-size: 0.87rem; color: #57534e; }
+  .steal b { color: var(--ink); font-weight: 650; }
+  .tags { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tag { background: var(--accent-soft); color: #92400e; border-radius: 999px; padding: 2px 8px; font-size: 0.68rem; }
+  .marimo { font-size: 0.78rem; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 10px; }
+  .marimo code { font-size: 0.76rem; background: #f4eee4; padding: 1px 4px; border-radius: 4px; }
+  .empty { grid-column: 1 / -1; padding: 40px; text-align: center; color: var(--muted); }
+  footer { border-top: 1px solid var(--line); padding: 28px 0 60px; color: var(--muted); font-size: 0.82rem; }
+  .recreations { padding: 10px 0 42px; border-bottom: 1px solid var(--line); }
+  .recreations h2 { font-family: "Iowan Old Style", Georgia, serif; font-size: 1.8rem; margin: 0 0 6px; }
+  .recreations p { max-width: 66ch; color: #57534e; }
+  .recreations .links { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+  .recreations .links a { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 6px 12px; text-decoration: none; color: var(--ink); font-size: 0.82rem; }
+  .recreations .links a:hover { border-color: var(--accent); color: var(--accent); }
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <div class="eyebrow">Reference library · captured October 2026</div>
+    <h1>Visual essays that make you operate something</h1>
+    <p class="lede">A working shelf of interactive explanations, annotated diagrams, playable simulations, and live shaders. Each card names the mechanism worth stealing and how it maps onto marimo. The catalog is the argument; the screenshots are evidence.</p>
+    <nav class="top">
+      <a href="#catalog">Catalog</a>
+      <a href="#recreations">Recreations</a>
+      <a href="README.md">Field notes</a>
+      <a href="capture.py">Capture tool</a>
+    </nav>
+    <div class="stats">
+      <div class="stat"><strong>32</strong><span>references</span></div>
+      <div class="stat"><strong>24</strong><span>screenshots</span></div>
+      <div class="stat"><strong>21</strong><span>sites</span></div>
+      <div class="stat"><strong>31</strong><span>patterns</span></div>
+    </div>
+  </div>
+</header>
+
+<section class="recreations" id="recreations">
+  <div class="wrap">
+    <h2>Recreations</h2>
+    <p>Small, dependency-light scaffolds for the patterns that are awkward to express with a chart: a draggable canvas, a GLSL field, a Three.js scene, and a WebGPU shader with a fallback.</p>
+    <div class="links">
+      <a href="recreations/index.html">Open the lab</a>
+      <a href="recreations/direct-manipulation.html">Direct manipulation</a>
+      <a href="recreations/glsl-field.html">GLSL field</a>
+      <a href="recreations/three-scene.html">Three.js scene</a>
+      <a href="recreations/webgpu-field.html">WebGPU field</a>
+    </div>
+  </div>
+</section>
+
+<div class="controls" id="catalog">
+  <div class="wrap row">
+    <label class="field">Search
+      <input id="q" type="search" placeholder="title, site, topic, note" autocomplete="off">
+    </label>
+    <label class="field">Pattern
+      <select id="pattern"><option value="">All patterns</option></select>
+    </label>
+    <label class="field">Site
+      <select id="site"><option value="">All sites</option></select>
+    </label>
+    <span class="count" id="count"></span>
+  </div>
+</div>
+
+<main class="wrap">
+  <div class="grid" id="grid"></div>
+</main>
+
+<footer>
+  <div class="wrap">
+    Screenshots are for reference and critique. Every page remains the work of its author. Built from
+    <code>references.json</code> and <code>captures.json</code>. To recapture a page, run
+    <code>uv run --script docs/visual-essays/capture.py --only &lt;slug&gt; --force</code>.
+  </div>
+</footer>
+
+<script id="data" type="application/json">[{"slug": "distill-momentum", "title": "Why Momentum Really Works", "site": "Distill", "author": "Gabriel Goh", "year": 2017, "url": "https://distill.pub/2017/momentum/", "topics": ["optimization", "interactive"], "patterns": ["direct-manipulation", "parameter-sweep", "annotated-diagram"], "why": "Two sliders control a trajectory in a loss landscape, and the picture redraws immediately. The interaction is the explanation: you feel the difference between step size and momentum instead of reading a definition.", "steal": "Put the two parameters that actually trade off next to one canvas. Draw the trajectory, the starting point, and the destination in the same frame. Label the control with the symbol the text uses.", "marimo": "`mo.ui.slider` plus an Altair or anywidget canvas. Keep the state in Python and redraw the whole figure on each change.", "capture": true, "image": "assets/distill-momentum.jpg"}, {"slug": "distill-feature-viz", "title": "Feature Visualization", "site": "Distill", "author": "Chris Olah, Alexander Mordvintsev, Ludwig Schubert", "year": 2017, "url": "https://distill.pub/2017/feature-visualization/", "topics": ["interpretability", "vision"], "patterns": ["visual-atlas", "small-multiples", "progressive-construction"], "why": "The article treats a network's features as a visual collection, not as a single summary number. The repeated image grid gives the reader a way to compare hundreds of features without a table.", "steal": "Use a stable small-multiple grid with one visual grammar. Add zoom and a short annotation for the one tile that carries the point. Do not make every tile a different chart type.", "marimo": "A CSS grid of `mo.image` or `mo.Html` tiles; a dropdown to switch layers; `mo.ui.anywidget` if the grid needs to be panned.", "capture": true, "image": "assets/distill-feature-viz.jpg"}, {"slug": "distill-building-blocks", "title": "The Building Blocks of Interpretability", "site": "Distill", "author": "Chris Olah, Arvind Satyanarayan, Ian Johnson, Shan Carter, Ludwig Schubert, Katherine Ye, Alexander Mordvintsev", "year": 2018, "url": "https://distill.pub/2018/building-blocks/", "topics": ["interpretability", "interface"], "patterns": ["linked-views", "annotated-diagram", "direct-manipulation"], "why": "It shows how separate interpretability views become useful when they are linked: pick a feature, see where it fires, see the attribution, see the label. The interface is the argument for combining methods.", "steal": "Coordinate two views with one selection. A click in the feature map should highlight the matching row in the attribution chart and the text snippet. Keep the selection visible in every panel.", "marimo": "`mo.ui.altair_chart` selection plus a shared Python variable; or an anywidget that owns the linked state. Use `mo.ui.table` for the text rows.", "capture": true, "image": "assets/distill-building-blocks.jpg"}, {"slug": "distill-gnn-intro", "title": "A Gentle Introduction to Graph Neural Networks", "site": "Distill", "author": "Benjamin Sanchez-Lengeling, Emily Reif, Adam Pearce, Alexander B. Wiltschko", "year": 2021, "url": "https://distill.pub/2021/gnn-intro/", "topics": ["graphs", "deep learning"], "patterns": ["progressive-construction", "annotated-diagram", "small-multiples"], "why": "The same graph drawing returns in every section, gaining one element at a time: nodes, edges, messages, pooling. The reader never has to rebuild the mental image.", "steal": "Design one reusable diagram and mutate it across sections. Keep the layout fixed so the new part is obvious. Put the equation next to the picture, not in a separate block.", "marimo": "One `mo.Html` SVG function with parameters for the visible parts; call it with a different boolean per section.", "capture": true, "image": "assets/distill-gnn-intro.jpg"}, {"slug": "transformer-circuits-framework", "title": "A Mathematical Framework for Transformer Circuits", "site": "Transformer Circuits", "author": "Nelson Elhage, Neel Nanda, Catherine Olsson, et al.", "year": 2021, "url": "https://transformer-circuits.pub/2021/framework/index.html", "topics": ["transformers", "interpretability", "math"], "patterns": ["annotated-diagram", "progressive-construction", "linked-views"], "why": "The tensor diagrams are a grammar, not decoration. The same shapes and arrows recur until the reader can read a circuit from the picture and check it against the equation.", "steal": "Invent a small visual vocabulary (residual stream as a line, heads as matrices, paths as arrows) and use it unchanged for the whole essay. Hover or click should reveal the matching term.", "marimo": "`mo.Html` SVG with `<title>` tooltips and CSS hover; a shared Python function that draws the circuit from a small graph spec.", "capture": true, "scroll_y": 30400, "image": "assets/transformer-circuits-framework.jpg"}, {"slug": "transformer-circuits-toy-models", "title": "Toy Models of Superposition", "site": "Transformer Circuits", "author": "Nelson Elhage, Tristan Hume, Catherine Olsson, et al.", "year": 2022, "url": "https://transformer-circuits.pub/2022/toy_model/index.html", "topics": ["interpretability", "representation"], "patterns": ["phase-diagram", "small-multiples", "annotated-diagram"], "why": "A single geometric picture carries the thesis: features crowd into dimensions, and the phase diagram makes the regimes visible. The reader can see why the result is not a single lucky run.", "steal": "If the argument has regimes, draw the regime map. Annotate the boundary, not every point. Pair the map with one concrete example from each side.", "marimo": "Altair heatmap or `mo.Html` canvas for the phase diagram; a click selects a cell and redraws the corresponding toy example.", "capture": true, "image": "assets/transformer-circuits-toy-models.jpg"}, {"slug": "transformer-circuits-biology", "title": "On the Biology of a Large Language Model", "site": "Transformer Circuits", "author": "Anthropic Interpretability Team", "year": 2025, "url": "https://transformer-circuits.pub/2025/attribution-graphs/biology.html", "topics": ["interpretability", "language models"], "patterns": ["annotated-diagram", "graph-layout", "linked-views"], "why": "Attribution graphs read left to right like a computation, with feature families color-coded and examples attached. It is the clearest recent example of a custom visual grammar for model internals.", "steal": "Lay out a computation as a directed graph with a consistent reading direction. Use color for role, not for rank. Let the reader click a node to see the text that activates it.", "marimo": "An anywidget with a graph layout; or a static SVG generated from a JSON graph with hover annotations.", "capture": false, "image": null}, {"slug": "lilian-attention", "title": "Attention? Attention!", "site": "Lilian Weng", "author": "Lilian Weng", "year": 2018, "url": "https://lilianweng.github.io/posts/2018-06-24-attention/", "topics": ["attention", "deep learning", "survey"], "patterns": ["long-form", "taxonomy", "annotated-diagram"], "why": "A dense literature is organized into a family tree of variants, with consistent notation and a diagram for each mechanism. The hierarchy does most of the teaching.", "steal": "Open with a taxonomy figure and reuse it as the section map. Keep one notation table and refer back to it. Put the variant's one-line difference under every diagram.", "marimo": "`mo.md` sections, a reusable notation table, and `mo.Html` for the taxonomy tree. Use anchors for the long-form navigation.", "capture": true, "scroll_y": 900, "image": "assets/lilian-attention.jpg"}, {"slug": "lilian-agents", "title": "LLM Powered Autonomous Agents", "site": "Lilian Weng", "author": "Lilian Weng", "year": 2023, "url": "https://lilianweng.github.io/posts/2023-06-23-agent/", "topics": ["agents", "language models", "systems"], "patterns": ["long-form", "system-diagram", "taxonomy"], "why": "The canonical agent architecture diagram is simple enough to remember and detailed enough to organize the whole post. It turns a sprawling topic into four boxes and their loops.", "steal": "Draw the system once, then use its parts as the section headings. Keep the diagram at the top of every section, with the current part highlighted.", "marimo": "One `mo.Html` SVG with a `highlight` parameter; section cells pass the relevant part.", "capture": true, "scroll_y": 500, "image": "assets/lilian-agents.jpg"}, {"slug": "nan-database", "title": "Build Your Own Database", "site": "NaN (nan.fyi)", "author": "Nanda Syahrasyad", "year": 2024, "url": "https://www.nan.fyi/database", "topics": ["databases", "systems", "tutorial"], "patterns": ["progressive-construction", "stateful-diagram", "direct-manipulation"], "why": "The reader builds a key-value store from a file, then watches segments compact and indices update. The persistent artifact changes under the reader's clicks, which makes the invariants concrete.", "steal": "Give the reader a small artifact they can mutate. Show the before and after state in the same frame. Put the problem statement before the mechanism, then let the reader press the button that resolves it.", "marimo": "`mo.ui.button` plus a Python state object; render the artifact as `mo.Html`. Use `mo.ui.run_button` only for expensive work.", "capture": true, "scroll_y": 1250, "image": "assets/nan-database.jpg"}, {"slug": "ciechanowski-gears", "title": "Gears", "site": "Bartosz Ciechanowski", "author": "Bartosz Ciechanowski", "year": 2019, "url": "https://ciechanow.ski/gears/", "topics": ["mechanics", "physics"], "patterns": ["3d-spatial", "direct-manipulation", "progressive-construction"], "why": "The reader drags gears, changes teeth, and watches the mechanism fail or mesh. The page is a sequence of small physical experiments, not a sequence of paragraphs.", "steal": "Start with one moving part and add one constraint at a time. Use motion trails, force arrows, and a reset button. Let the reader break the mechanism safely.", "marimo": "An anywidget with a canvas or WebGL renderer; `mo.ui.slider` for the parameters. Keep the simulation loop in JS and sync only the control values.", "capture": true, "image": "assets/ciechanowski-gears.jpg"}, {"slug": "ciechanowski-moon", "title": "Moon", "site": "Bartosz Ciechanowski", "author": "Bartosz Ciechanowski", "year": 2024, "url": "https://ciechanow.ski/moon/", "topics": ["astronomy", "physics"], "patterns": ["3d-spatial", "timeline", "progressive-construction"], "why": "A complex spatial system is made readable by keeping the camera under the reader's control and explaining one frame at a time. The timeline scrubber turns an orbit into something you can inspect.", "steal": "When time matters, give the reader a scrubber. When space matters, give them a camera. Keep the explanatory overlay in screen space so it stays readable while the world moves.", "marimo": "An anywidget with Three.js; expose time and camera as traits. Use a separate 2D SVG inset for the diagram that must stay legible.", "capture": false, "image": null}, {"slug": "setosa-pca", "title": "Principal Component Analysis", "site": "Explained Visually (Setosa)", "author": "Victor Powell, Lewis Lehe", "year": 2015, "url": "https://setosa.io/ev/principal-component-analysis/", "topics": ["linear algebra", "statistics"], "patterns": ["direct-manipulation", "linked-views", "annotated-diagram"], "why": "The reader drags a point cloud and watches the principal axes and the projection change. One interaction carries the whole idea of variance maximization.", "steal": "One draggable object, one derived quantity, one immediate redraw. Put the numerical readout next to the visual, not in a separate panel.", "marimo": "`mo.ui.anywidget` canvas with pointer events, or `mo.ui.altair_chart` selection if the points are a Vega dataset. A slider is a weaker substitute for direct dragging.", "capture": false, "scroll_y": 3400, "image": null}, {"slug": "setosa-markov", "title": "Markov Chains", "site": "Explained Visually (Setosa)", "author": "Victor Powell, Lewis Lehe", "year": 2014, "url": "https://setosa.io/ev/markov-chains/", "topics": ["probability", "linear algebra"], "patterns": ["linked-views", "direct-manipulation", "annotated-diagram"], "why": "The state diagram and the transition matrix are linked. Clicking a state highlights the corresponding row, so the matrix stops being an arbitrary grid.", "steal": "Link the symbolic view to the spatial view. A selection in one should be visible in the other without a legend.", "marimo": "A shared selection variable between an SVG state diagram and a styled HTML table or Altair heatmap.", "capture": true, "image": "assets/setosa-markov.jpg"}, {"slug": "r2d3-ml", "title": "A Visual Introduction to Machine Learning", "site": "R2D3", "author": "Stephanie Yee, Tony Chu", "year": 2015, "url": "https://r2d3.us/visual-intro-to-machine-learning-part-1/", "topics": ["machine learning", "scrollytelling"], "patterns": ["scrollytelling", "sticky-figure", "progressive-construction"], "why": "The visualization stays fixed while the text adds one split, then another. The reader's scroll becomes the model's training step.", "steal": "Use a sticky figure and short steps. Each step should change exactly one thing in the figure. Do not make the reader scroll back to compare.", "marimo": "CSS `position: sticky` around an `mo.Html` figure, with `mo.md` steps; or a single anywidget that reads a step index from a slider. Marimo's layout does not give you scroll progress for free.", "capture": true, "image": "assets/r2d3-ml.jpg"}, {"slug": "nicky-polygons", "title": "Parable of the Polygons", "site": "Nicky Case", "author": "Vi Hart, Nicky Case", "year": 2014, "url": "https://ncase.me/polygons/", "topics": ["segregation", "social science", "simulation"], "patterns": ["playable-simulation", "direct-manipulation", "moral-argument"], "why": "The reader sets a tiny individual preference and watches segregation emerge. The mechanic is the argument, so the conclusion lands without a paragraph of exposition.", "steal": "If the claim is about a feedback loop, let the reader set the loop's parameter and run it. Show the aggregate consequence next to the individual rule.", "marimo": "A small Python simulation with `mo.ui.slider` and a redraw; for smooth animation, an anywidget. Keep the run button explicit so the reader can compare settings.", "capture": true, "image": "assets/nicky-polygons.jpg"}, {"slug": "nicky-trust", "title": "The Evolution of Trust", "site": "Nicky Case", "author": "Nicky Case", "year": 2017, "url": "https://ncase.me/trust/", "topics": ["game theory", "cooperation"], "patterns": ["playable-simulation", "repeated-game", "progressive-construction"], "why": "The reader plays a repeated prisoner's dilemma, then sees the strategies compete. The payoff matrix becomes a lived experience, not a table to memorize.", "steal": "Make the reader choose once before showing the equilibrium. Reveal the aggregate after the choice, then let them replay with a different rule.", "marimo": "A state machine in Python with `mo.ui.button` choices and a small history table; an anywidget if the animation matters.", "capture": false, "scroll_y": 620, "image": null}, {"slug": "bret-victor-explorable", "title": "Explorable Explanations", "site": "Bret Victor", "author": "Bret Victor", "year": 2011, "url": "http://worrydream.com/ExplorableExplanations/", "topics": ["essay", "interaction design"], "patterns": ["manifesto", "direct-manipulation"], "why": "The founding argument for the genre: the reader should be able to act, not just read. It is useful as a design stance even when the visuals are simple.", "steal": "Ask what the reader should be able to try. If the answer is nothing, the essay may not need interaction. If it is one thing, build that one thing well.", "marimo": "No special widget. Use it as a review question before adding controls.", "capture": true, "image": "assets/bret-victor-explorable.jpg"}, {"slug": "bret-victor-ladder", "title": "Up and Down the Ladder of Abstraction", "site": "Bret Victor", "author": "Bret Victor", "year": 2011, "url": "https://worrydream.com/LadderOfAbstraction/", "topics": ["systems", "visualization"], "patterns": ["linked-views", "multiple-representations", "direct-manipulation"], "why": "The same system is shown at several levels, from a concrete trajectory to an abstract field. The reader can move between representations without losing the object.", "steal": "If you have several representations, link them to the same underlying state and let the reader switch. Do not present them as separate figures with separate data.", "marimo": "A shared state object and a `mo.ui.radio` or tabs for the representation; render each with `mo.Html` or Altair from the same data.", "capture": false, "image": null}, {"slug": "explorables-all", "title": "Explorable Explanations: all entries", "site": "Explorable Explanations", "author": "Nicky Case and contributors", "year": 2026, "url": "https://explorabl.es/all/", "topics": ["index", "interaction design"], "patterns": ["gallery", "curation"], "why": "The best single index of the genre, with 180 entries across math, physics, biology, civics, and journalism. Use it to find a mechanic, not to copy a page.", "steal": "Browse by mechanic (drag, play, build, compare) rather than by topic. Pick one mechanic you have not used and adapt it to your argument.", "marimo": "A curated `mo.ui.table` or gallery notebook with tags and links; do not try to embed the whole index.", "capture": true, "image": "assets/explorables-all.jpg"}, {"slug": "seeing-theory", "title": "Seeing Theory", "site": "Brown University", "author": "Daniel Kunin, Jingru Guo, Tyler Dae Devlin, Daniel Xiang", "year": 2016, "url": "https://seeing-theory.brown.edu/", "topics": ["probability", "statistics", "textbook"], "patterns": ["interactive-textbook", "small-multiples", "direct-manipulation"], "why": "A sequence of small, focused probability interactions. Each chapter has one visual idea and one thing to try, which keeps the cognitive load low.", "steal": "One interaction per concept. Put the instruction next to the control and make the expected observation explicit.", "marimo": "One `mo.ui.slider` or `mo.ui.button` per section, with a compact Altair or SVG figure. Avoid a control panel that changes everything at once.", "capture": true, "image": "assets/seeing-theory.jpg"}, {"slug": "immersive-math", "title": "Immersive Math", "site": "Immersive Math", "author": "Jacob Ström, Kalle Åström, Tomas Akenine-Möller", "year": 2017, "url": "https://immersivemath.com/ila/index.html", "topics": ["linear algebra", "textbook"], "patterns": ["interactive-textbook", "linked-views", "3d-spatial"], "why": "Every equation has a figure you can manipulate, and the figure updates the equation. The link between notation and geometry is the whole design.", "steal": "Pair each equation with a direct manipulation of its terms. When the reader changes a vector, show the numeric change in the equation immediately.", "marimo": "`mo.ui.slider` or anywidget for the geometry; render the equation with `mo.md` and update the numbers from the same state.", "capture": true, "image": "assets/immersive-math.jpg"}, {"slug": "book-of-shaders", "title": "The Book of Shaders", "site": "The Book of Shaders", "author": "Patricio Gonzalez Vivo, Jen Lowe", "year": 2015, "url": "https://thebookofshaders.com/03/", "topics": ["shaders", "graphics", "tutorial"], "patterns": ["live-code", "progressive-construction", "direct-manipulation"], "why": "Every concept is a runnable shader with an editable code panel. The feedback loop is immediate, so the reader learns the language by changing it.", "steal": "If you are teaching a visual language, put the code and the canvas side by side. Make the smallest possible edit the reader can try. Keep the default output interesting before they touch it.", "marimo": "An anywidget with a WebGL canvas and a textarea, or `mo.ui.code_editor` plus a JS renderer. Sync only on run, not on every keystroke.", "capture": false, "scroll_y": 0, "image": null}, {"slug": "maxime-heckel-shaders", "title": "Beautiful and mind-bending effects with WebGL Render Targets", "site": "Maxime Heckel", "author": "Maxime Heckel", "year": 2021, "url": "https://blog.maximeheckel.com/posts/beautiful-and-mind-bending-effects-with-webgl-render-targets/", "topics": ["shaders", "three.js", "graphics"], "patterns": ["live-code", "3d-spatial", "art-directed"], "why": "A technical post with an art-directed hero, live shader demos, and code that matches the visuals. It treats the visual as part of the argument, not as a screenshot after the fact.", "steal": "Build the hero visual from the same primitives the post teaches. Keep the palette and typography consistent between the page and the canvas.", "marimo": "An anywidget with Three.js loaded from a CDN; keep the shader source in Python and pass it as a trait so the notebook owns the code.", "capture": true, "scroll_y": 5600, "image": "assets/maxime-heckel-shaders.jpg"}, {"slug": "threejs-examples", "title": "Three.js Examples", "site": "Three.js", "author": "Three.js contributors", "year": 2026, "url": "https://threejs.org/examples/", "topics": ["3d", "graphics", "reference"], "patterns": ["3d-spatial", "gallery"], "why": "A working catalog of 3D interaction primitives: orbit controls, instancing, postprocessing, physics, and shader materials. It is a parts bin, not an essay.", "steal": "Borrow one primitive at a time. The examples are deliberately isolated, which makes them easy to lift into a notebook.", "marimo": "An anywidget bundle with Three.js; do not load the whole examples catalog. Copy the minimal setup for the one feature you need.", "capture": false, "image": null}, {"slug": "webgpu-samples", "title": "WebGPU Samples", "site": "WebGPU", "author": "WebGPU contributors", "year": 2026, "url": "https://webgpu.github.io/webgpu-samples/", "topics": ["webgpu", "graphics", "compute"], "patterns": ["3d-spatial", "live-code", "gallery"], "why": "The current reference for browser-native GPU work, with render and compute examples. Use it when the computation itself is the visual, not for a static chart.", "steal": "Start from the smallest triangle or compute pass. Add one buffer at a time. Keep a fallback path for browsers without WebGPU.", "marimo": "An anywidget with a WebGPU canvas; feature-detect `navigator.gpu` and show a static fallback. Keep the WGSL in a separate string for readability.", "capture": false, "image": null}, {"slug": "pudding-waveforms", "title": "Let's Learn About Waveforms", "site": "The Pudding", "author": "Josh Comeau", "year": 2018, "url": "https://pudding.cool/2018/02/waveforms/", "topics": ["audio", "physics", "scrollytelling"], "patterns": ["audio-visual", "scrollytelling", "direct-manipulation"], "why": "Sound and image are tied together: press play and the waveform moves. The reader can hear the thing the text is describing.", "steal": "If the subject has a time-based signal, add a play button and animate the same diagram. Do not use audio as decoration; make it the thing under study.", "marimo": "`mo.ui.audio` or an anywidget with the Web Audio API; animate a canvas from the analyser data. Always provide a pause and a reduced-motion path.", "capture": true, "image": "assets/pudding-waveforms.jpg"}, {"slug": "ink-switch-local-first", "title": "Local-first software", "site": "Ink & Switch", "author": "Martin Kleppmann, Adam Wiggins, Peter van Hardenberg, Mark McGranaghan", "year": 2019, "url": "https://www.inkandswitch.com/local-first/", "topics": ["software", "research essay"], "patterns": ["thesis-principles", "prototype-as-evidence", "annotated-diagram"], "why": "A research essay that pairs each principle with a prototype or a concrete scenario. The design claims are tested against artifacts, not only argued.", "steal": "State the thesis, then give each principle a small demo or a worked example. End with the cases where the thesis fails.", "marimo": "A section per principle, each with a small `mo.ui` demo or a data-backed figure. Use the same layout for every principle so the comparison is easy.", "capture": true, "image": "assets/ink-switch-local-first.jpg"}, {"slug": "observable-algorithms", "title": "Visualizing Algorithms", "site": "Mike Bostock", "author": "Mike Bostock", "year": 2014, "url": "https://bost.ocks.org/mike/algorithms/", "topics": ["algorithms", "visualization"], "patterns": ["animated-process", "direct-manipulation", "small-multiples"], "why": "Algorithms are shown as processes with state you can inspect. The animation is not decoration; it is the execution trace.", "steal": "Expose the state that changes, not just the final output. Add play, pause, and step. Keep the trace visible after the animation ends.", "marimo": "An anywidget with a step function and a play loop; or a Python generator advanced by `mo.ui.button`. Use `mo.status.progress_bar` only for long computations.", "capture": true, "image": "assets/observable-algorithms.jpg"}, {"slug": "colah-lstm", "title": "Understanding LSTM Networks", "site": "colah's blog", "author": "Christopher Olah", "year": 2015, "url": "https://colah.github.io/posts/2015-08-Understanding-LSTMs/", "topics": ["recurrent networks", "deep learning"], "patterns": ["annotated-diagram", "progressive-construction"], "why": "The diagrams are built from a tiny set of visual primitives (lines, boxes, circles) and repeated until the reader can read the network. The notation is the teaching.", "steal": "Define the visual primitives once, then reuse them. Add one gate at a time and label the operation, not the whole diagram.", "marimo": "A reusable `mo.Html` SVG function with primitives; `mo.md` prose between figures. No interaction required if the diagram sequence is strong.", "capture": true, "image": "assets/colah-lstm.jpg"}, {"slug": "alammar-transformer", "title": "The Illustrated Transformer", "site": "Jay Alammar", "author": "Jay Alammar", "year": 2018, "url": "https://jalammar.github.io/illustrated-transformer/", "topics": ["transformers", "deep learning"], "patterns": ["annotated-diagram", "progressive-construction", "small-multiples"], "why": "A complex architecture is introduced as a sequence of matrices and arrows, with each step isolated. The visual sequence is the reader's working memory.", "steal": "Show one matrix operation per figure. Keep the same token colors across the whole essay so the reader can track a token through the pipeline.", "marimo": "`mo.Html` with a token color map in Python; render each step from the same data. A slider can scrub the sequence if it gets long.", "capture": true, "scroll_y": 1000, "image": "assets/alammar-transformer.jpg"}, {"slug": "ciechanowski-cameras", "title": "Cameras and Lenses", "site": "Bartosz Ciechanowski", "author": "Bartosz Ciechanowski", "year": 2019, "url": "https://ciechanow.ski/cameras-and-lenses/", "topics": ["optics", "physics"], "patterns": ["3d-spatial", "direct-manipulation", "progressive-construction"], "why": "The reader moves a lens, changes its focal length, and sees the image form. The page turns an optical bench into a toy that can be manipulated.", "steal": "Give the reader a physical handle for the one variable that matters, and redraw the ray diagram immediately. Keep the labels in screen space so they stay legible while the geometry moves.", "marimo": "An anywidget with a canvas or WebGL renderer; sliders for focal length and aperture. Sync only the controls and redraw in JS.", "capture": true, "image": "assets/ciechanowski-cameras.jpg"}]</script>
+<script>
+const data = JSON.parse(document.getElementById("data").textContent);
+const state = { q: "", pattern: "", site: "" };
+const grid = document.getElementById("grid");
+const count = document.getElementById("count");
+const qInput = document.getElementById("q");
+const patternSelect = document.getElementById("pattern");
+const siteSelect = document.getElementById("site");
+
+const esc = (value) => String(value).replace(/[&<>"']/g, (ch) => ({
+  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+}[ch]));
+
+const allPatterns = [...new Set(data.flatMap((entry) => entry.patterns))].sort();
+const allSites = [...new Set(data.map((entry) => entry.site))].sort();
+for (const pattern of allPatterns) {
+  const option = document.createElement("option");
+  option.value = pattern;
+  option.textContent = pattern.replaceAll("-", " ");
+  patternSelect.appendChild(option);
+}
+for (const site of allSites) {
+  const option = document.createElement("option");
+  option.value = site;
+  option.textContent = site;
+  siteSelect.appendChild(option);
+}
+
+function matches(entry) {
+  const haystack = [
+    entry.title, entry.site, entry.author, entry.topics.join(" "),
+    entry.patterns.join(" "), entry.why, entry.steal
+  ].join(" ").toLowerCase();
+  return (!state.q || haystack.includes(state.q))
+    && (!state.pattern || entry.patterns.includes(state.pattern))
+    && (!state.site || entry.site === state.site);
+}
+
+function card(entry) {
+  const image = entry.image
+    ? `<img src="${esc(entry.image)}" alt="Screenshot of ${esc(entry.title)}" loading="lazy">`
+    : `<div class="fallback"><span>${esc(entry.site)}</span><small>${esc(entry.patterns[0].replaceAll("-", " "))}</small></div>`;
+  const tags = entry.patterns.slice(0, 3).map((pattern) =>
+    `<span class="tag">${esc(pattern.replaceAll("-", " "))}</span>`).join("");
+  return `<article class="card">
+    <a class="shot" href="${esc(entry.url)}" target="_blank" rel="noopener">${image}</a>
+    <div class="card-body">
+      <div class="meta"><span class="site">${esc(entry.site)}</span><span>${esc(entry.year)}</span></div>
+      <h2><a href="${esc(entry.url)}" target="_blank" rel="noopener">${esc(entry.title)}</a></h2>
+      <p class="why">${esc(entry.why)}</p>
+      <div class="steal"><b>Steal this.</b> ${esc(entry.steal)}</div>
+      <div class="tags">${tags}</div>
+      <div class="marimo"><b>Marimo.</b> ${esc(entry.marimo)}</div>
+    </div>
+  </article>`;
+}
+
+function render() {
+  const visible = data.filter(matches);
+  grid.innerHTML = visible.length
+    ? visible.map(card).join("")
+    : `<div class="empty">No references match that filter.</div>`;
+  count.textContent = `${visible.length} of ${data.length}`;
+}
+
+qInput.addEventListener("input", () => { state.q = qInput.value.trim().toLowerCase(); render(); });
+patternSelect.addEventListener("change", () => { state.pattern = patternSelect.value; render(); });
+siteSelect.addEventListener("change", () => { state.site = siteSelect.value; render(); });
+render();
+</script>
+</body>
+</html>

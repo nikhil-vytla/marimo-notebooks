@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Direct manipulation · visual essay recreation</title>
+<style>
+  :root {
+    --paper: #f6f2ea; --card: #fffdf8; --ink: #292524; --muted: #78716c;
+    --line: #e7e0d4; --accent: #b45309; --accent-soft: #fdf0df;
+    --blue: #1d4ed8; --green: #047857;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.55;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+  header { padding: 46px 0 24px; border-bottom: 1px solid var(--line); }
+  .eyebrow {
+    font: 650 0.7rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent);
+  }
+  h1 {
+    font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    font-size: clamp(2rem, 4.5vw, 3.4rem); line-height: 1.05;
+    letter-spacing: -0.02em; margin: 10px 0 14px; max-width: 18ch;
+  }
+  .lede { max-width: 68ch; color: #44403c; margin: 0 0 12px; }
+  .back { font-size: 0.84rem; color: var(--muted); text-decoration: none; }
+  .back:hover { color: var(--accent); }
+  main { padding: 28px 0 56px; }
+  .lab { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(260px, 0.8fr); gap: 18px; align-items: start; }
+  @media (max-width: 820px) { .lab { grid-template-columns: 1fr; } }
+  .figure, .panel {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  }
+  .figure { overflow: hidden; }
+  canvas { display: block; width: 100%; aspect-ratio: 4 / 3; cursor: grab; touch-action: none; }
+  canvas:active { cursor: grabbing; }
+  .figure-note { padding: 10px 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.8rem; }
+  .panel { padding: 18px; display: flex; flex-direction: column; gap: 16px; }
+  .panel h2 { font-family: "Iowan Old Style", Georgia, serif; font-size: 1.25rem; margin: 0; }
+  .control { display: flex; flex-direction: column; gap: 6px; }
+  .control label { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between; gap: 12px; }
+  input[type="range"] { width: 100%; accent-color: var(--accent); }
+  .toggle { display: flex; align-items: center; gap: 10px; font-size: 0.88rem; }
+  .toggle input { accent-color: var(--accent); width: 18px; height: 18px; }
+  .readout { border-top: 1px dashed var(--line); padding-top: 12px; display: grid; gap: 8px; }
+  .metric { display: flex; justify-content: space-between; gap: 12px; font-size: 0.85rem; }
+  .metric b { font-variant-numeric: tabular-nums; }
+  .bars { display: grid; gap: 7px; margin-top: 2px; }
+  .bar { height: 9px; border-radius: 999px; background: #efe7db; overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0%; background: var(--accent); transition: width 120ms linear; }
+  .bar.classifier i { background: #111827; }
+  .bar-label { display: flex; justify-content: space-between; font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .hint { font-size: 0.78rem; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 12px; }
+  .reset { align-self: flex-start; border: 1px solid var(--line); background: var(--accent-soft); color: #92400e; border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 0.8rem; cursor: pointer; }
+  .reset:hover { border-color: var(--accent); }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="eyebrow">Recreation · direct manipulation</div>
+    <h1>Drag the cloud. The bars are the consequence.</h1>
+    <p class="lede">A small Canvas 2D scaffold for the compression dial. The reader moves the hidden state itself, not a form that describes it. The stop-gradient toggle changes whether the cloud is allowed to shrink.</p>
+    <a class="back" href="../index.html">← back to the reference library</a>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="lab">
+    <div class="figure">
+      <canvas id="cloud" aria-label="A cloud of hidden activations. Drag it toward or away from the origin."></canvas>
+      <div class="figure-note">Drag anywhere in the plot. Closer to the origin means a more compressed hidden state.</div>
+    </div>
+    <aside class="panel">
+      <h2>What you are changing</h2>
+      <div class="control">
+        <label for="pressure">self-model pressure <span id="pressure-value">0.65</span></label>
+        <input id="pressure" type="range" min="0" max="1" step="0.01" value="0.65">
+      </div>
+      <label class="toggle"><input id="detach" type="checkbox" checked> stop-gradient (detached target)</label>
+      <div class="readout">
+        <div class="metric"><span>hidden norm |a|</span><b id="hidden-norm">0.00</b></div>
+        <div class="bars">
+          <div class="bar"><i id="hidden-bar"></i></div>
+          <div class="bar-label"><span>hidden</span><span>target scale</span></div>
+        </div>
+        <div class="metric"><span>classifier norm |W|</span><b id="classifier-norm">0.00</b></div>
+        <div class="bars">
+          <div class="bar classifier"><i id="classifier-bar"></i></div>
+          <div class="bar-label"><span>classifier</span><span>grows to keep logits fixed</span></div>
+        </div>
+        <div class="metric"><span>self-model error</span><b id="error">0.000</b></div>
+      </div>
+      <button class="reset" id="reset" type="button">Reset</button>
+      <p class="hint">The numbers are a toy, not a trained run. The point is the coupling: the classifier grows when the hidden state is compressed.</p>
+    </aside>
+  </div>
+</main>
+
+<script>
+(() => {
+  const canvas = document.getElementById("cloud");
+  const ctx = canvas.getContext("2d");
+  const pressureInput = document.getElementById("pressure");
+  const detachInput = document.getElementById("detach");
+  const pressureValue = document.getElementById("pressure-value");
+  const hiddenNormEl = document.getElementById("hidden-norm");
+  const classifierNormEl = document.getElementById("classifier-norm");
+  const errorEl = document.getElementById("error");
+  const hiddenBar = document.getElementById("hidden-bar");
+  const classifierBar = document.getElementById("classifier-bar");
+  const reset = document.getElementById("reset");
+
+  let state = { x: 0.55, y: 0.12, detach: true, dragging: false };
+  let points = [];
+  let seed = 17;
+
+  function random() {
+    seed = (seed * 1664525 + 1013904223) % 4294967296;
+    return seed / 4294967296;
+  }
+
+  function gaussian() {
+    const u = Math.max(random(), 1e-6);
+    const v = random();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  }
+
+  function rebuild() {
+    seed = 17;
+    points = Array.from({ length: 150 }, (_, i) => ({
+      g: gaussian(),
+      h: gaussian(),
+      color: i % 3,
+    }));
+  }
+  rebuild();
+
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = Math.max(1, Math.round(rect.width * dpr));
+    canvas.height = Math.max(1, Math.round(rect.height * dpr));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
+  }
+
+  function metrics() {
+    const dist = Math.min(1, Math.hypot(state.x, state.y));
+    const spread = state.detach ? 0.24 + 0.56 * dist : 0.8;
+    const hidden = Math.max(0.08, 0.35 + 0.95 * dist);
+    const classifier = 1.25 + 1.6 * (1 - hidden / 1.3);
+    const error = Math.abs(spread - (state.detach ? spread : 0.8)) + 0.004;
+    return { dist, spread, hidden, classifier, error };
+  }
+
+  function draw() {
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "#fbf7ef";
+    ctx.fillRect(0, 0, w, h);
+
+    const cx = w * 0.5;
+    const cy = h * 0.48;
+    const scale = Math.min(w, h) * 0.34;
+
+    // quiet grid
+    ctx.strokeStyle = "#e9e1d4";
+    ctx.lineWidth = 1;
+    for (let i = -3; i <= 3; i++) {
+      ctx.beginPath();
+      ctx.moveTo(cx + i * scale * 0.5, 0);
+      ctx.lineTo(cx + i * scale * 0.5, h);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, cy + i * scale * 0.5);
+      ctx.lineTo(w, cy + i * scale * 0.5);
+      ctx.stroke();
+    }
+
+    // axes
+    ctx.strokeStyle = "#a8a29e";
+    ctx.beginPath();
+    ctx.moveTo(0, cy); ctx.lineTo(w, cy);
+    ctx.moveTo(cx, 0); ctx.lineTo(cx, h);
+    ctx.stroke();
+
+    // unit ring
+    ctx.strokeStyle = "#c7b9a5";
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.arc(cx, cy, scale, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    const m = metrics();
+    const px = cx + state.x * scale;
+    const py = cy - state.y * scale;
+    const spread = m.spread * scale;
+
+    // cloud
+    for (const point of points) {
+      const x = px + point.g * spread;
+      const y = py + point.h * spread;
+      ctx.beginPath();
+      ctx.arc(x, y, 3.1, 0, Math.PI * 2);
+      ctx.fillStyle = ["#b45309", "#1d4ed8", "#047857"][point.color];
+      ctx.globalAlpha = 0.78;
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // center handle
+    ctx.beginPath();
+    ctx.arc(px, py, 7, 0, Math.PI * 2);
+    ctx.fillStyle = "#fffdf8";
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#292524";
+    ctx.stroke();
+
+    // origin
+    ctx.beginPath();
+    ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+    ctx.fillStyle = "#292524";
+    ctx.fill();
+
+    // labels
+    ctx.fillStyle = "#78716c";
+    ctx.font = "11px ui-sans-serif, system-ui, sans-serif";
+    ctx.fillText("origin", cx + 8, cy - 8);
+    ctx.fillText("|a| = 1", cx + scale - 34, cy - 8);
+    ctx.fillText("drag the cloud", px + 12, py + 4);
+  }
+
+  function update() {
+    const m = metrics();
+    pressureValue.textContent = (1 - m.dist).toFixed(2);
+    hiddenNormEl.textContent = m.hidden.toFixed(2);
+    classifierNormEl.textContent = m.classifier.toFixed(2);
+    errorEl.textContent = m.error.toFixed(3);
+    hiddenBar.style.width = `${Math.min(100, m.hidden / 1.4 * 100)}%`;
+    classifierBar.style.width = `${Math.min(100, m.classifier / 3.2 * 100)}%`;
+    draw();
+  }
+
+  function pointer(event) {
+    const rect = canvas.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / rect.width;
+    const y = (event.clientY - rect.top) / rect.height;
+    state.x = Math.max(-1.15, Math.min(1.15, (x - 0.5) * 2.3));
+    state.y = Math.max(-1.05, Math.min(1.05, -(y - 0.48) * 2.1));
+    pressureInput.value = String(1 - Math.min(1, Math.hypot(state.x, state.y)) / 1.0);
+    update();
+  }
+
+  canvas.addEventListener("pointerdown", (event) => {
+    state.dragging = true;
+    canvas.setPointerCapture(event.pointerId);
+    pointer(event);
+  });
+  canvas.addEventListener("pointermove", (event) => {
+    if (state.dragging) pointer(event);
+  });
+  canvas.addEventListener("pointerup", () => { state.dragging = false; });
+  canvas.addEventListener("pointercancel", () => { state.dragging = false; });
+
+  pressureInput.addEventListener("input", () => {
+    const pressure = Number(pressureInput.value);
+    const angle = Math.atan2(state.y, state.x) || 0.3;
+    const dist = (1 - pressure) * 1.15;
+    state.x = Math.cos(angle) * dist;
+    state.y = Math.sin(angle) * dist;
+    update();
+  });
+
+  detachInput.addEventListener("change", () => {
+    state.detach = detachInput.checked;
+    update();
+  });
+
+  reset.addEventListener("click", () => {
+    state = { x: 0.55, y: 0.12, detach: true, dragging: false };
+    pressureInput.value = "0.65";
+    detachInput.checked = true;
+    update();
+  });
+
+  window.addEventListener("resize", resize);
+  resize();
+  update();
+  window.__status = { ready: true, canvas: true, pattern: "direct-manipulation" };
+})();
+</script>
+</body>
+</html>

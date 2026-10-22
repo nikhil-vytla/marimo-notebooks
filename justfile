@@ -2,17 +2,17 @@
 default:
     @just --list
 
-# Check notebooks with marimo and lint with ruff.
+# Check notebooks and templates with marimo and lint with ruff.
 check:
     #!/usr/bin/env bash
     set -euo pipefail
-    files=$(find notebooks -name '*.py' -not -path '*/reference/*' -not -path '*/tests/*')
+    files=$(find notebooks templates -name '*.py' -not -path '*/reference/*' -not -path '*/tests/*')
     if [ -n "$files" ]; then
         uvx marimo check --strict $files
         uv run --no-project python scripts/check_empty_cells.py $files
     fi
     uvx typos
-    uvx ruff check notebooks templates
+    uvx ruff check notebooks templates scripts
 
 # Run a notebook headless in script mode.
 smoke path:
@@ -40,6 +40,21 @@ new slug:
     mkdir -p "$dir"
     cp templates/notebook.py "$dir/$snake.py"
     printf '# %s\n\nStatus: planned\n\n- Molab:\n- Sources:\n\n## Files\n\n- `%s.py` — the entry notebook.\n' "$title" "$snake" > "$dir/README.md"
+
+# Scaffold an essay folder from templates/essay.py.
+new-essay slug:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    dir="notebooks/{{slug}}"
+    if [ -e "$dir" ]; then
+        echo "error: $dir already exists" >&2
+        exit 1
+    fi
+    snake=$(printf '%s' "{{slug}}" | tr '-' '_')
+    title=$(printf '%s' "{{slug}}" | tr '-' ' ')
+    mkdir -p "$dir/public/data"
+    cp templates/essay.py "$dir/$snake.py"
+    printf '# %s\n\nStatus: planned\n\n- Molab:\n- Paper:\n\n## Files\n\n- `%s.py` — the visual essay; reads `public/data/`.\n' "$title" "$snake" > "$dir/README.md"
 
 # List notebook folders and their status.
 list:

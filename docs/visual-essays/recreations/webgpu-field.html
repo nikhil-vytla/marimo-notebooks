@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WebGPU field · visual essay recreation</title>
+<style>
+  :root { --paper:#f6f2ea; --card:#fffdf8; --ink:#292524; --muted:#78716c; --line:#e7e0d4; --accent:#b45309; --accent-soft:#fdf0df; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; line-height:1.55; }
+  .wrap { max-width:1120px; margin:0 auto; padding:0 24px; }
+  header { padding:46px 0 24px; border-bottom:1px solid var(--line); }
+  .eyebrow { font:650 .7rem/1.2 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.1em; text-transform:uppercase; color:var(--accent); }
+  h1 { font-family:"Iowan Old Style","Palatino Linotype",Georgia,serif; font-size:clamp(2rem,4.5vw,3.4rem); line-height:1.05; letter-spacing:-.02em; margin:10px 0 14px; max-width:18ch; }
+  .lede { max-width:68ch; color:#44403c; margin:0 0 12px; }
+  .back { font-size:.84rem; color:var(--muted); text-decoration:none; }
+  .back:hover { color:var(--accent); }
+  main { padding:28px 0 56px; }
+  .lab { display:grid; grid-template-columns:minmax(0,1.45fr) minmax(260px,.8fr); gap:18px; align-items:start; }
+  @media (max-width:820px){ .lab{grid-template-columns:1fr;} }
+  .figure,.panel { background:var(--card); border:1px solid var(--line); border-radius:12px; }
+  .figure { overflow:hidden; position:relative; }
+  canvas { display:block; width:100%; aspect-ratio:4/3; background:#111827; }
+  .figure-note { padding:10px 14px; border-top:1px solid var(--line); color:var(--muted); font-size:.8rem; }
+  .panel { padding:18px; display:flex; flex-direction:column; gap:16px; }
+  .panel h2 { font-family:"Iowan Old Style",Georgia,serif; font-size:1.25rem; margin:0; }
+  .control { display:flex; flex-direction:column; gap:6px; }
+  .control label { font-size:.72rem; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); display:flex; justify-content:space-between; gap:12px; }
+  input[type=range] { width:100%; accent-color:var(--accent); }
+  button { border:1px solid var(--line); background:var(--accent-soft); color:#92400e; border-radius:999px; padding:6px 12px; font:inherit; font-size:.8rem; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  .fallback { display:none; padding:24px; color:#e7e5e4; background:#111827; min-height:320px; }
+  .fallback.show { display:block; }
+  .fallback code { color:#fbbf24; }
+  .hint { font-size:.78rem; color:var(--muted); border-top:1px dashed var(--line); padding-top:12px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="eyebrow">Recreation · WebGPU</div>
+    <h1>The GPU is useful when the computation is the picture.</h1>
+    <p class="lede">A WGSL full-screen fragment shader with one uniform and a fallback. Use this scaffold when the visual is a field, a particle system, or a simulation, not a static chart.</p>
+    <a class="back" href="../index.html">← back to the reference library</a>
+  </div>
+</header>
+<main class="wrap">
+  <div class="lab">
+    <div class="figure">
+      <canvas id="gpu" aria-label="Animated WGSL field"></canvas>
+      <div class="fallback" id="fallback">
+        <strong>WebGPU is not available in this browser.</strong>
+        <p>The page still loads. Try Chrome with WebGPU enabled, or keep the 2D fallback. The shader source is in the page for reference.</p>
+      </div>
+      <div class="figure-note">One uniform buffer, one draw call, one full-screen triangle.</div>
+    </div>
+    <aside class="panel">
+      <h2>Controls</h2>
+      <div class="control">
+        <label for="freq">frequency <span id="freq-value">6.0</span></label>
+        <input id="freq" type="range" min="2" max="14" step="0.1" value="6">
+      </div>
+      <button id="toggle" type="button">Pause</button>
+      <p class="hint">Feature-detect <code>navigator.gpu</code> before you promise a visual. Keep a static fallback that still explains the idea.</p>
+      <p class="hint">The WGSL is deliberately short. Swap the field function and keep the uniform plumbing.</p>
+    </aside>
+  </div>
+</main>
+<script>
+(() => {
+  const canvas = document.getElementById("gpu");
+  const fallback = document.getElementById("fallback");
+  const freqInput = document.getElementById("freq");
+  const freqValue = document.getElementById("freq-value");
+  const toggle = document.getElementById("toggle");
+  window.__status = { ready: true, canvas: false, webgpu: false, pattern: "webgpu-field" };
+
+  if (!navigator.gpu) {
+    fallback.classList.add("show");
+    canvas.style.display = "none";
+    window.__status.ready = true;
+    window.__status.error = "no-webgpu";
+    return;
+  }
+
+  const wgsl = `
+    struct U {
+      res: vec2f,
+      time: f32,
+      freq: f32,
+    };
+    @group(0) @binding(0) var<uniform> u: U;
+
+    @vertex
+    fn vs(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f {
+      var p = array<vec2f, 3>(
+        vec2f(-1.0, -1.0),
+        vec2f(3.0, -1.0),
+        vec2f(-1.0, 3.0)
+      );
+      return vec4f(p[i], 0.0, 1.0);
+    }
+
+    @fragment
+    fn fs(@builtin(position) pos: vec4f) -> @location(0) vec4f {
+      let uv = (pos.xy - 0.5 * u.res) / min(u.res.x, u.res.y);
+      let r = length(uv);
+      let a = atan2(uv.y, uv.x);
+      let wave = sin(r * u.freq * 3.0 - u.time + sin(a * 3.0));
+      let ring = smoothstep(0.72, 1.0, abs(wave));
+      let ink = vec3f(0.055, 0.065, 0.09);
+      let ember = vec3f(0.78, 0.34, 0.08);
+      let sand = vec3f(0.95, 0.86, 0.68);
+      var col = mix(ink, ember, 0.5 + 0.5 * wave);
+      col = mix(col, sand, ring * 0.55);
+      col *= 1.0 - 0.35 * smoothstep(0.4, 0.9, r);
+      return vec4f(col, 1.0);
+    }
+  `;
+
+  async function main() {
+    const adapter = await navigator.gpu.requestAdapter();
+    if (!adapter) throw new Error("no adapter");
+    const device = await adapter.requestDevice();
+    const context = canvas.getContext("webgpu");
+    const format = navigator.gpu.getPreferredCanvasFormat();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = Math.max(1, Math.round(rect.width * dpr));
+    canvas.height = Math.max(1, Math.round(rect.height * dpr));
+    context.configure({ device, format, alphaMode: "opaque" });
+
+    const module = device.createShaderModule({ code: wgsl });
+    const pipeline = device.createRenderPipeline({
+      layout: "auto",
+      vertex: { module, entryPoint: "vs" },
+      fragment: { module, entryPoint: "fs", targets: [{ format }] },
+      primitive: { topology: "triangle-list" }
+    });
+
+    const uniformBuffer = device.createBuffer({
+      size: 16,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    });
+    const bindGroup = device.createBindGroup({
+      layout: pipeline.getBindGroupLayout(0),
+      entries: [{ binding: 0, resource: { buffer: uniformBuffer } }]
+    });
+
+    let freq = 6;
+    let time = 0;
+    let paused = false;
+    let last = performance.now();
+    const data = new Float32Array(4);
+
+    function frame(now) {
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      if (!paused) time += dt;
+      data[0] = canvas.width;
+      data[1] = canvas.height;
+      data[2] = time;
+      data[3] = freq;
+      device.queue.writeBuffer(uniformBuffer, 0, data);
+      const encoder = device.createCommandEncoder();
+      const pass = encoder.beginRenderPass({
+        colorAttachments: [{
+          view: context.getCurrentTexture().createView(),
+          clearValue: { r: 0.06, g: 0.07, b: 0.1, a: 1 },
+          loadOp: "clear",
+          storeOp: "store"
+        }]
+      });
+      pass.setPipeline(pipeline);
+      pass.setBindGroup(0, bindGroup);
+      pass.draw(3);
+      pass.end();
+      device.queue.submit([encoder.finish()]);
+      requestAnimationFrame(frame);
+    }
+
+    freqInput.addEventListener("input", () => {
+      freq = Number(freqInput.value);
+      freqValue.textContent = freq.toFixed(1);
+    });
+    toggle.addEventListener("click", () => {
+      paused = !paused;
+      toggle.textContent = paused ? "Play" : "Pause";
+    });
+    requestAnimationFrame(frame);
+    window.__status = { ready: true, canvas: true, webgpu: true, pattern: "webgpu-field" };
+  }
+
+  main().catch((error) => {
+    fallback.classList.add("show");
+    canvas.style.display = "none";
+    window.__status = { ready: true, canvas: false, webgpu: false, error: String(error), pattern: "webgpu-field" };
+  });
+})();
+</script>
+</body>
+</html>

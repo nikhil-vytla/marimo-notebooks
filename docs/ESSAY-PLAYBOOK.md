@@ -37,6 +37,11 @@ The self-modeling essay follows this arc, and it generalizes.
 The null results are not an appendix. In this essay they are the second
 act, and they are why the piece is worth reading.
 
+The guided cut in
+[`self_modeling_guided.py`](../notebooks/self-modeling/self_modeling_guided.py)
+is the reference implementation of this arc. The lab notebook is the
+evidence appendix.
+
 ## Build order
 
 ### Stage 0: read for claims
@@ -168,6 +173,14 @@ A dropdown of variants, the same metric and axis for each, and the
 result table. The empty result is a result. The CIFAR probe table is
 this pattern.
 
+### Direct manipulation
+
+A drag target beats a slider when the thing being changed has a shape.
+The compression dial in the self-modeling essay is this pattern: the
+reader drags a dial, the hidden cloud shrinks, and two bars show the
+classifier growing to compensate. The widget interpolates precomputed
+frames, so the interaction is instant and the numbers stay reproducible.
+
 ### Contrast two datasets
 
 Run the same ablation on the dataset where the effect is real and the
@@ -268,10 +281,14 @@ The frontier, in order of payoff:
 
 ## The self-modeling essay: next moves
 
-1. **CIFAR architecture gap.** The skip connection from block 3 into the
-   hidden layer is the biggest unresolved difference. Implement it
-   faithfully and rerun 3A and 3B. If the inversion flips, you have a
-   result. If it does not, you have a stronger negative.
+1. **CIFAR exact target.** The authors' released code uses the full
+   512x4x4 block-4 map (8192 values) plus the 2000 hidden activations as
+   the self-model target, with Adam at 1e-4 and batch 64. Our run used
+   the pooled 512-vector and 1e-3. The skip tests were a misreading of
+   the prose. A one-seed, 25-epoch pilot at the full target gave 0.01538
+   at AW 0 and 0.01481 at AW 2, the paper's direction. Confirm with 3
+   seeds at 25 epochs, then run 10 seeds at batch 64, 250 epochs before
+   drawing a conclusion.
 2. **More seeds for the slow-head control.** Three seeds and 100 epochs
    is a sign. Ten seeds and 250 epochs is a measurement. Pre-register
    the read-out before running.
@@ -349,6 +366,10 @@ posts, not good essays.
 
 If the hero figure does not run in twenty minutes, the paper is a bigger
 project than a first pass. Say so early.
+
+## Visual references
+
+The [visual essay reference library](visual-essays/) collects 32 annotated examples, captured screenshots, and a pattern-to-marimo table. Start with the [gallery](visual-essays/index.html), then use the [interaction lab](visual-essays/recreations/index.html) when a chart is the wrong shape for the idea. The [capture tool](visual-essays/capture.py) makes the shelf extendable.
 
 ## Things I would do differently
 

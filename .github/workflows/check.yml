@@ -19,9 +19,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
       - uses: extractions/setup-just@v3
-      - name: Smoke test entry notebooks
+      - name: Smoke test notebooks and templates
         run: |
-          for f in $(find notebooks -name '*.py' -not -path '*/reference/*' -not -path '*/tests/*'); do
+          for f in $(find notebooks templates -name '*.py' -not -path '*/reference/*' -not -path '*/tests/*'); do
             if head -30 "$f" | grep -q '# smoke: skip'; then
               echo "skip $f"
               continue

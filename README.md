@@ -5,12 +5,14 @@ Keeping track of various interactive notebooks I'm building!
 | Topic | Status | Molab |
 | ----- | ------ | ----- |
 | [Bayes' Theorem](notebooks/bayes-theorem/) | 🟡 in-progress | [![molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/notebooks/nb_qdtZuHRiZTstYLoUFnLs4P) [![github](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/nikhil-vytla/marimo-notebooks/blob/main/notebooks/bayes-theorem/bayes_theorem.py) |
-| [Self-Modeling in Neural Systems](notebooks/self-modeling/) | 🟡 in-progress | [![essay](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/nikhil-vytla/marimo-notebooks/blob/main/notebooks/self-modeling/self_modeling_essay.py) [![train (GPU)](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/nikhil-vytla/marimo-notebooks/blob/main/notebooks/self-modeling/self_modeling_train.py) |
+| [Self-Modeling in Neural Systems](notebooks/self-modeling/) | 🟡 in-progress | [![guided essay](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/nikhil-vytla/marimo-notebooks/blob/main/notebooks/self-modeling/self_modeling_guided.py) [![lab notebook](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/nikhil-vytla/marimo-notebooks/blob/main/notebooks/self-modeling/self_modeling_essay.py) [![train (GPU)](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/nikhil-vytla/marimo-notebooks/blob/main/notebooks/self-modeling/self_modeling_train.py) |
 
 ## Working on this repo
 
-See [AGENTS.md](AGENTS.md) for layout and conventions. Use `just` for everything: `just list`, `just new <slug>`, `just edit <path>`, `just check`, `just smoke <path>`.
+See [AGENTS.md](AGENTS.md) for layout and conventions. Use `just` for everything: `just list`, `just new <slug>`, `just new-essay <slug>`, `just edit <path>`, `just check`, `just smoke <path>`.
 
 ## Method
 
-See [docs/ESSAY-PLAYBOOK.md](docs/ESSAY-PLAYBOOK.md) for choosing papers, the data contract, interaction patterns, the marimo capability ladder, and what to do next.
+See [docs/ESSAY-PLAYBOOK.md](docs/ESSAY-PLAYBOOK.md) for choosing papers, the data contract, interaction patterns, the marimo capability ladder, and what to do next. See [docs/ESSAY-SHELL.md](docs/ESSAY-SHELL.md) for the reusable essay frame in [templates/essay.py](templates/essay.py).
+
+For a curated shelf of visual essays, captured screenshots, pattern notes, and interaction recreations, see [docs/visual-essays/](docs/visual-essays/). Open the [gallery](docs/visual-essays/index.html) or the [interaction lab](docs/visual-essays/recreations/index.html).
