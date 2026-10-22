@@ -269,6 +269,11 @@ def _(mo):
           text-transform: uppercase;
           color: var(--muted);
         }
+        @media (max-width: 640px) {
+          div[style*="flex-flow: wrap"] > div {
+            min-width: 100% !important;
+          }
+        }
         .figure-caption {
           font-size: 0.8rem;
           line-height: 1.45;
@@ -797,7 +802,7 @@ def _(DIAL, mo):
           const chartHit = mk("rect", {
             x: chartX, y: 264, width: chartW, height: 128,
             fill: "transparent", style: "cursor: ew-resize; touch-action: none;",
-            "aria-label": "Scrub AW on the norm chart",
+            "aria-hidden": "true",
           });
           svg.appendChild(chartHit);
 
@@ -1261,7 +1266,7 @@ def _(CIFAR_FIG3, alt, mo, pd):
         .mark_text(align="center", dy=-12, fontSize=10, fontWeight=600, color="#b45309")
         .encode(x="aw:Q", y="mean:Q", text=alt.value("ours"))
     )
-    _chart = (_band + _line + _label).properties(width=340, height=380)
+    _chart = (_band + _line + _label).properties(width="container", height=380)
     _paper = mo.image(
         str(
             mo.notebook_location()
@@ -1291,8 +1296,8 @@ def _(CIFAR_FIG3, alt, mo, pd):
         '<p class="figure-caption">Figure 4. The paper\'s CIFAR panel '
         'and ours. The paper\'s baseline is the widest curve at epoch '
         '250. Ours starts at the same absolute scale but rises with AW. '
-        'The ordering is inverted. Both axes start at zero; ours extends '
-        'to 0.08. '
+        'The ordering is inverted. The paper plots epoch; ours plots AW. '
+        'Both y axes start at zero; ours extends to 0.08. '
         'Paper panel reproduced from '
         'Premakumar et al., 2024, Figure 3A; our curve uses '
         '<code>cifar_fig3.json</code>, 10 seeds.</p>'
