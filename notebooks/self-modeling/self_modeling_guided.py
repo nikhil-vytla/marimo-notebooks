@@ -1429,6 +1429,16 @@ def _(
 
 @app.cell(hide_code=True)
 def _(mo):
+    mo.Html(
+        '<blockquote class="pullquote">The stop-gradient is essential '
+        'to the MNIST mechanism and irrelevant to the CIFAR inversion. '
+        'Both can be true.</blockquote>'
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
     mo.md(r"""
     ## The pressure has to persist
 
@@ -1906,14 +1916,6 @@ def _(mo):
     return
 
 
-@app.cell(hide_code=True)
-def _(mo):
-    mo.Html(
-        '<blockquote class="pullquote">The stop-gradient is essential '
-        'to the MNIST mechanism and irrelevant to the CIFAR inversion. '
-        'Both can be true.</blockquote>'
-    )
-    return
 
 
 @app.cell(hide_code=True)
