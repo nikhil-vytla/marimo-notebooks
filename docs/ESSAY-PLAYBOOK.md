@@ -281,11 +281,12 @@ The frontier, in order of payoff:
 
 ## The self-modeling essay: next moves
 
-1. **CIFAR exact protocol.** The pooled skip at batch 512 and the
-   spatial skip at batch 64 both kept the inversion. At batch 64 the
-   standard model went 0.0759 -> 0.1001 and the spatial model 0.1050 ->
-   0.1101. The remaining test is a 10-seed, 150-epoch run at batch 64
-   with the paper's exact schedule and augmentation.
+1. **CIFAR exact target.** The authors' released code uses the full
+   512x4x4 block-4 map (8192 values) plus the 2000 hidden activations as
+   the self-model target, with Adam at 1e-4 and batch 64. Our run used
+   the pooled 512-vector and 1e-3. The skip tests were a misreading of
+   the prose. Rerun with the code's target before drawing a conclusion
+   about the CIFAR ordering.
 2. **More seeds for the slow-head control.** Three seeds and 100 epochs
    is a sign. Ten seeds and 250 epochs is a measurement. Pre-register
    the read-out before running.

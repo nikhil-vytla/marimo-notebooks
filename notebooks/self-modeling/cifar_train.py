@@ -111,6 +111,10 @@ def _(mo):
       pooled concatenation of block 3 and block 4. At 150 epochs, 2 seeds,
       batch 512, it lowered the absolute SD but did not flip the ordering.
       A spatial skip at batch 64, 75 epochs, 1 seed, also failed to flip it.
+      The authors' released code has no separate block-3 skip. Its target is
+      the full 512x4x4 block-4 map (8192 values) plus the 2000 hidden
+      activations, with Adam at 1e-4; the skip probes were a misreading of
+      the prose.
     - Every run (including AW = 0) has the same output layer,
       `Linear(2000, 10 + target_dim)` (`target_dim` = 2512 for `concat`, 2000
       for `hidden`), so seeds share identical classification rows.

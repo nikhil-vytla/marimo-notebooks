@@ -320,7 +320,7 @@ def _():
         "authors": "Premakumar et al., 2024",
         "status": "v1 · guided cut",
         "status_class": "partly",
-        "reading_time": "17 min",
+        "reading_time": "16 min",
         "updated": "2026-10-19",
         "repo": "https://github.com/nikhil-vytla/marimo-notebooks",
     }
@@ -370,7 +370,7 @@ def _(mo):
           <a href="#the-mechanism">The mechanism</a>
           <a href="#the-stop-gradient">The stop-gradient</a>
           <a href="#the-pressure-has-to-persist">The pressure</a>
-          <a href="#the-skip-test">The skip test</a>
+          <a href="#what-the-code-says">What the code says</a>
           <a href="#the-scoreboard">The scoreboard</a>
           <a href="#what-next">What next</a>
         </nav>
@@ -1284,7 +1284,7 @@ def _(CIFAR_FIG3, alt, mo, pd):
                 gap=0.35,
             ),
             mo.vstack(
-                [mo.md("**Ours, 10 seeds**"), _chart],
+                [mo.md("**Ours, pooled target**"), _chart],
                 gap=0.35,
             ),
         ],
@@ -1298,7 +1298,8 @@ def _(CIFAR_FIG3, alt, mo, pd):
         '250. Ours starts at the same absolute scale but rises with AW. '
         'The ordering is inverted. The paper plots epoch; ours plots AW. '
         'Both y axes start at zero; ours extends to 0.08. '
-        'Paper panel reproduced from '
+        'Our curve uses the pooled block-4 target, not the code\'s full '
+        '8192-value target. Paper panel reproduced from '
         'Premakumar et al., 2024, Figure 3A; our curve uses '
         '<code>cifar_fig3.json</code>, 10 seeds.</p>'
     )
@@ -1466,7 +1467,8 @@ def _(
 
     CIFAR is the counterexample. The paper's panel shows the baseline
     widest and the self-modeling curves lower. Ours starts at the same
-    absolute scale but rises with AW. The ordering is inverted.
+    absolute scale but rises with AW. The ordering is inverted, but our
+    target is not the authors' target. The audit below has the details.
 
     The stop-gradient is a separate question. In a two-seed, 50-epoch
     CIFAR probe at AW 0 and 2, dropping it changes the SD from
@@ -1810,201 +1812,45 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## The skip test
+    ## What the code says
 
-    The synthesis leaves an obvious objection. The paper's hidden input
-    includes a skip from block 3, and our first CIFAR run did not. That
-    is the largest architectural difference between the two.
+    The paper's prose mentions "skip connections from the third block
+    to the hidden layer." The authors' released code does not implement
+    a separate block-3 skip. Its hidden input is only the pooled block-4
+    output; the only skip in the model is the ResNet block's internal
+    residual connection. The phrase in the prose does not match the
+    released model.
 
-    We implemented the simplest faithful version: global-pool block 3
-    and block 4, concatenate the 256- and 512-vectors, and feed the
-    768-vector into the 2000-wide hidden layer. The self-model target is
-    the concatenation of that input and the hidden activations.
+    The code's target is also larger than the prose implies. It
+    flattens the full 512x4x4 block-4 output, 8192 values, and
+    concatenates the 2000 hidden activations. Our CIFAR run used the
+    pooled 512-vector plus the hidden layer. The code's target is about
+    four times larger. The optimizer differs too: the code uses Adam at
+    `1e-4`, while the paper's Table 1 says `1e-3` and our run used
+    `1e-3`.
+
+    That makes our skip tests the wrong hypothesis. The pooled and
+    spatial variants did not flip the ordering because the authors'
+    code does not contain the extra skip. The real gap is the target
+    definition and the learning rate. We have not yet rerun CIFAR with
+    the code's target.
+
+    | | authors' code | our guided run |
+    | --- | --- | --- |
+    | target | block-4 map (8192) + hidden (2000) | pooled block-4 (512) + hidden (2000) |
+    | optimizer | Adam, `1e-4` | Adam, `1e-3` |
+    | batch | 64 | 512 |
+    | block-3 skip | none | pooled and spatial tested |
+
+    <p class="figure-caption">Table 1. Implementation audit. The
+    authors' repository now returns 404; the archived snapshot is linked
+    below. The paper's Table 1 says `1e-3` for CIFAR, while the code
+    says `1e-4`.</p>
+
+    Source: [authors' code](https://archive.softwareheritage.org/browse/snapshot/e32679e6355c20ff6f3b419c4fc39be3d3584850/directory/?path=CIFAR)
+    and the [published paper](https://royalsocietypublishing.org/rsta/article/384/2320/20240531/481682).
     """)
     return
-
-
-@app.cell(hide_code=True)
-def _(json, mo, pd):
-    _skip = json.loads(
-        (
-            mo.notebook_location()
-            / "public"
-            / "data"
-            / "cifar_skip.json"
-        ).read_text()
-    )
-    _labels = {
-        "none": "standard ResNet-18",
-        "block3": "block-3 skip",
-        "spatial": "spatial skip",
-    }
-    _rows = []
-    for _value in _skip["results"].values():
-        _rows.append(
-            {
-                "mode": _labels[_value["skip"]],
-                "aw": f"AW={_value['aw']:g}",
-                "mean": float(_value["sd_mean"]),
-                "half": float(_value["sd_ci"]),
-                "acc": float(_value["acc_mean"]),
-            }
-        )
-    CIFAR_SKIP = pd.DataFrame(_rows)
-    CIFAR_SKIP["lo"] = CIFAR_SKIP["mean"] - CIFAR_SKIP["half"]
-    CIFAR_SKIP["hi"] = CIFAR_SKIP["mean"] + CIFAR_SKIP["half"]
-
-    _b64_rows = []
-    for _value in _skip.get("batch64", {}).get("results", {}).values():
-        _b64_rows.append(
-            {
-                "mode": _labels[_value["skip"]],
-                "aw": f"AW={_value['aw']:g}",
-                "mean": float(_value["sd_mean"]),
-                "acc": float(_value["acc_mean"]),
-            }
-        )
-    CIFAR_SKIP_B64 = pd.DataFrame(_b64_rows)
-    return (CIFAR_SKIP, CIFAR_SKIP_B64)
-
-
-@app.cell(hide_code=True)
-def _(CIFAR_SKIP, alt, mo):
-    _order = ["AW=0", "AW=2"]
-    _scale = alt.Scale(
-        domain=["standard ResNet-18", "block-3 skip"],
-        range=["#111827", "#b45309"],
-    )
-    _band = (
-        alt.Chart(CIFAR_SKIP)
-        .mark_area(opacity=0.15)
-        .encode(
-            x=alt.X(
-                "aw:N",
-                sort=_order,
-                title=None,
-                axis=alt.Axis(labelAngle=0),
-            ),
-            y=alt.Y(
-                "lo:Q",
-                title="Classifier weight SD (epoch 150)",
-                scale=alt.Scale(zero=False),
-            ),
-            y2="hi:Q",
-            color=alt.Color("mode:N", scale=_scale, legend=None),
-        )
-    )
-    _line = (
-        alt.Chart(CIFAR_SKIP)
-        .mark_line(point=True, strokeWidth=2)
-        .encode(
-            x=alt.X("aw:N", sort=_order),
-            y=alt.Y("mean:Q"),
-            color=alt.Color(
-                "mode:N",
-                scale=_scale,
-                legend=alt.Legend(title=None, orient="bottom"),
-            ),
-            tooltip=[
-                alt.Tooltip("mode:N", title="model"),
-                alt.Tooltip("aw:N", title="AW"),
-                alt.Tooltip("mean:Q", format=".4f", title="SD"),
-                alt.Tooltip("half:Q", format=".4f", title="95% CI"),
-                alt.Tooltip("acc:Q", format=".3f", title="accuracy"),
-            ],
-        )
-    )
-    _labels = (
-        alt.Chart(CIFAR_SKIP[CIFAR_SKIP["aw"] == "AW=2"])
-        .mark_text(align="center", dy=-10, fontSize=10, fontWeight=600)
-        .encode(
-            x=alt.X("aw:N", sort=_order),
-            y=alt.Y("mean:Q"),
-            text="mode:N",
-            color=alt.Color("mode:N", scale=_scale, legend=None),
-        )
-    )
-    _chart = (_band + _line + _labels).properties(
-        width="container", height=280
-    )
-    _caption = mo.md(
-        '<p class="figure-caption">Figure 7. The block-3 skip lowers '
-        'the level but not the ordering. Lines are means over two seeds; '
-        'bands are 95% CIs. At 150 epochs, batch 512. The paper reports '
-        'the opposite ordering: the baseline is widest and self-modeling '
-        'narrows it. The batch-64 probe is in the protocol check below. '
-        '<code>cifar_skip.json</code>; script: '
-        '<code>scripts/cifar_skip_experiment.py</code>.</p>'
-    )
-
-    mo.vstack([_chart, _caption])
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    The skip changes the level, not the ordering. At 150 epochs the
-    standard model goes from **0.0400** at AW 0 to **0.0508** at AW 2.
-    The block-3 model goes from **0.0321** to **0.0402**. The skip
-    lowers the absolute SD, but the self-modeling run is still wider.
-
-    The CIFAR inversion survives the obvious architectural fix. The
-    protocol check has the batch-64 numbers and the caveats.
-    """)
-    return
-
-
-@app.cell(hide_code=True)
-def _(CIFAR_SKIP_B64, mo):
-    _pivot = CIFAR_SKIP_B64.pivot(
-        index="mode", columns="aw", values="mean"
-    )
-    _acc = CIFAR_SKIP_B64.groupby("mode")["acc"].mean()
-    _short = {"standard ResNet-18": "standard", "spatial skip": "spatial"}
-    _rows = []
-    for _mode in ["standard ResNet-18", "spatial skip"]:
-        _rows.append(
-            f"<tr><td>{_short[_mode]}</td>"
-            f"<td>{_pivot.loc[_mode, 'AW=0']:.4f}</td>"
-            f"<td>{_pivot.loc[_mode, 'AW=2']:.4f}</td>"
-            f"<td>{_acc.loc[_mode]:.3f}</td></tr>"
-        )
-    _table = (
-        '<table class="protocol-table">'
-        "<thead><tr><th>model</th><th>AW 0</th><th>AW 2</th>"
-        "<th>accuracy</th></tr></thead>"
-        f"<tbody>{''.join(_rows)}</tbody></table>"
-    )
-    mo.Html(f"""
-    <details class="protocol-check">
-      <summary>Protocol check: batch 64, intervals, caveats</summary>
-      <div class="protocol-body">
-        <p>At batch 64 we used a spatial skip: concatenate block 3 with
-        an upsampled block 4, fuse them with a 1x1 convolution to 512,
-        then pool. At 75 epochs, the standard model goes from
-        <strong>0.0759</strong> to <strong>0.1001</strong>; the spatial
-        skip goes from <strong>0.1050</strong> to <strong>0.1101</strong>.
-        The absolute SD is much higher, and the ordering is still
-        inverted.</p>
-        {_table}
-        <p class="figure-caption">Table 1. The batch-64 probe. One seed,
-        75 epochs. At the paper's batch size the absolute SD is higher,
-        but the ordering is still inverted. Source:
-        <code>cifar_skip.json</code>.</p>
-        <p>The block-3 intervals do not overlap. The standard run's
-        two-seed intervals do, so read that arm as a sign rather than a
-        measurement. The batch-64 probe is one seed. The paper uses 150
-        epochs and does not pin down the skip placement. Both skip
-        placements fail to flip the ordering. This is a negative result
-        for the obvious architectural fix, not a proof that no
-        implementation would work.</p>
-      </div>
-    </details>
-    """)
-    return
-
-
 
 
 @app.cell(hide_code=True)
@@ -2046,9 +1892,10 @@ def _(mo):
     <strong>Yes</strong> means the paper's ordering and scale are within
     our interval; <strong>No</strong> means the ordering is inverted or
     the effect is missing; <strong>Partly</strong> means accuracy matches
-    but the effect does not. 3A was also tested with pooled and spatial
-    skips, at batch 512 and 64; the ordering stayed inverted. Full notes
-    and probes are in the lab notebook.</p>
+    but the effect does not. 3A is still no. The authors' code uses a
+    larger block-4 target and Adam at `1e-4`; our run used the pooled
+    target and `1e-3`. The exact-target rerun is the next test. Full
+    notes and probes are in the lab notebook.</p>
     """)
     return
 
@@ -2060,10 +1907,10 @@ def _(mo):
 
     Three experiments would change the conclusion:
 
-    - **A 10-seed batch-64 protocol.** Our batch-64 probe is one seed
-      and 75 epochs. The paper uses 150 epochs. A 10-seed run at the
-      paper's exact batch, schedule, and augmentation is the remaining
-      faithful CIFAR test.
+    - **The authors' CIFAR target.** Rerun at batch 64, Adam `1e-4`,
+      250 epochs, with the full 8192-value block-4 target plus the 2000
+      hidden activations, over 10 seeds. This is the implementation the
+      released code actually uses.
     - **More seeds for the slow-head control.** Three seeds and 100
       epochs is a sign. Ten seeds and 250 epochs is a measurement.
     - **A rank diagnostic for IMDB.** The hidden layer is 128 units from
