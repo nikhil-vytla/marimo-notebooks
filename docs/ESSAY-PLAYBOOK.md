@@ -286,8 +286,9 @@ The frontier, in order of payoff:
    the self-model target, with Adam at 1e-4 and batch 64. Our run used
    the pooled 512-vector and 1e-3. The skip tests were a misreading of
    the prose. A one-seed, 25-epoch pilot at the full target gave 0.01538
-   at AW 0 and 0.01481 at AW 2, the paper's direction. Complete the
-   10-seed, batch-64, 250-epoch run before drawing a conclusion.
+   at AW 0 and 0.01481 at AW 2, the paper's direction. Confirm with 3
+   seeds at 25 epochs, then run 10 seeds at batch 64, 250 epochs before
+   drawing a conclusion.
 2. **More seeds for the slow-head control.** Three seeds and 100 epochs
    is a sign. Ten seeds and 250 epochs is a measurement. Pre-register
    the read-out before running.

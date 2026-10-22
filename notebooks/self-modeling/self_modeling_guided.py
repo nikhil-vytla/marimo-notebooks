@@ -1836,7 +1836,7 @@ def _(mo):
 
     A one-seed, 25-epoch pilot at batch 512 with the full target gives
     **0.01538** at AW 0 and **0.01481** at AW 2. That is the paper's
-    direction. It is one seed, not the full 10-seed protocol. Source:
+    direction. It is one seed, not a distribution. Source:
     <code>cifar_fulltarget_pilot.json</code>.
 
     | | authors' code | our guided run |
@@ -1899,7 +1899,7 @@ def _(mo):
     but the effect does not. 3A is still no. The authors' code uses a
     larger block-4 target and Adam at `1e-4`; our run used the pooled
     target and `1e-3`. A one-seed pilot at the code target has the
-    right direction; the 10-seed run is pending. Full notes and probes
+    right direction; a multi-seed run is pending. Full notes and probes
     are in the lab notebook.</p>
     """)
     return
@@ -1912,10 +1912,10 @@ def _(mo):
 
     Three experiments would change the conclusion:
 
-    - **The authors' CIFAR target.** Complete the 10-seed run at batch
-      64, Adam `1e-4`, 250 epochs, with the full 8192-value block-4
-      target plus the 2000 hidden activations. This is the implementation
-      the released code actually uses.
+    - **The authors' CIFAR target.** First run 3 seeds at 25 epochs to
+      confirm the direction. Then run 10 seeds at batch 64, Adam `1e-4`,
+      250 epochs, with the full 8192-value block-4 target plus the 2000
+      hidden activations. The second run is the paper comparison.
     - **More seeds for the slow-head control.** Three seeds and 100
       epochs is a sign. Ten seeds and 250 epochs is a measurement.
     - **A rank diagnostic for IMDB.** The hidden layer is 128 units from
