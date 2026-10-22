@@ -98,12 +98,12 @@
     },
     {
       "id": "SFPL",
-      "code_hash": "8edbc5e33d68e3a8870bfe5bd26b4787",
+      "code_hash": "b7416518d6e2c4db695f8fbaaa06105e",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/html": "\n    <div class=\"verdict-grid\">\n      <div class=\"verdict-card yes\">\n        <div class=\"verdict-kicker\">MNIST \u00b7 Figure 2A</div>\n        <div class=\"verdict-number\">0.0974 \u2192 0.0812</div>\n        <div class=\"verdict-note\">\n          Narrower weights with more self-modeling. The paper's\n          effect, reproduced within 0.001.\n        </div>\n      </div>\n      <div class=\"verdict-card no\">\n        <div class=\"verdict-kicker\">CIFAR-10 \u00b7 Figure 3A</div>\n        <div class=\"verdict-number\">0.0252 \u2192 0.0292</div>\n        <div class=\"verdict-note\">\n          The ordering inverts: the baseline is the narrowest curve.\n          Accuracy still matches.\n        </div>\n      </div>\n      <div class=\"verdict-card no\">\n        <div class=\"verdict-kicker\">IMDB \u00b7 Figure 4A</div>\n        <div class=\"verdict-number\">0.232 flat</div>\n        <div class=\"verdict-note\">\n          No separation across AW, and about 9x below the paper's 2.05.\n          Accuracy matches at 85.2%.\n        </div>\n      </div>\n    </div>\n    "
+            "text/html": "\n    <div class=\"verdict-grid\">\n      <div class=\"verdict-card yes\">\n        <div class=\"verdict-kicker\">MNIST \u00b7 Figure 2A</div>\n        <div class=\"verdict-number\">0.0974 \u2192 0.0812</div>\n        <div class=\"verdict-note\">\n          Narrower weights with more self-modeling. The paper's\n          effect, reproduced within 0.001.\n        </div>\n      </div>\n      <div class=\"verdict-card no\">\n        <div class=\"verdict-kicker\">CIFAR-10 \u00b7 Figure 3A</div>\n        <div class=\"verdict-number\">0.0573 \u2192 0.0745</div>\n        <div class=\"verdict-note\">\n          The ordering inverts: the baseline is the narrowest curve.\n          Accuracy still matches.\n        </div>\n      </div>\n      <div class=\"verdict-card no\">\n        <div class=\"verdict-kicker\">IMDB \u00b7 Figure 4A</div>\n        <div class=\"verdict-number\">0.232 flat</div>\n        <div class=\"verdict-note\">\n          No separation across AW, and about 9x below the paper's 2.05.\n          Accuracy matches at 85.2%.\n        </div>\n      </div>\n    </div>\n    "
           }
         }
       ],
@@ -111,12 +111,12 @@
     },
     {
       "id": "BYtC",
-      "code_hash": "9f888f7aa32225f49a5cbb79ebbe242d",
+      "code_hash": "3594549e3af3990b86702bec0835a980",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><p class=\"figure-caption\">Figure 1. Three panels, three verdicts.\nMNIST and CIFAR numbers are the epoch-50 classifier weight SD; IMDB\nis the weight SD at the end of training. Sources:\n<code>mnist_detach_ablation.json</code>,\n<code>cifar_fig3_probes.json</code>, <code>imdb_fig4.json</code>.</span></span>"
+            "text/markdown": "<span class=\"markdown prose dark:prose-invert contents\"><p class=\"figure-caption\">Figure 1. Three panels, three verdicts.\nMNIST is the epoch-50 classifier weight SD. CIFAR is the epoch-250\nmean over 10 seeds. IMDB is the weight SD at the end of training.\nSources: <code>mnist_detach_ablation.json</code>,\n<code>cifar_fig3.json</code>, <code>imdb_fig4.json</code>.</span></span>"
           }
         }
       ],
@@ -168,7 +168,7 @@
         {
           "type": "data",
           "data": {
-            "text/html": "<marimo-ui-element object-id='Hstk-0' random-id='e8e8be5c-5f93-0b17-0a60-2d877a2eb934'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;e33a940c223d4b0da0edf9efebbaf815&quot;}' data-label='null' data-model-id='&quot;e33a940c223d4b0da0edf9efebbaf815&quot;'></marimo-anywidget></marimo-ui-element>"
+            "text/html": "<marimo-ui-element object-id='Hstk-0' random-id='b9d6b315-6fe6-57ca-af69-96675fa12348'><marimo-anywidget data-initial-value='{&quot;model_id&quot;:&quot;b047f91fb09942feaffac33a8b932dfd&quot;}' data-label='null' data-model-id='&quot;b047f91fb09942feaffac33a8b932dfd&quot;'></marimo-anywidget></marimo-ui-element>"
           }
         }
       ],
@@ -220,7 +220,7 @@
         {
           "type": "data",
           "data": {
-            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='ROlb-0' random-id='ee6771fa-e1df-a627-6cbc-9ecdbf25f770'><marimo-radio data-initial-value='null' data-label='&quot;&#92;u003cspan class=&#92;&quot;markdown prose dark:prose-invert contents&#92;&quot;&#92;u003e&#92;u003cspan class=&#92;&quot;paragraph&#92;&quot;&#92;u003eWhich dataset is sensitive to the stop-gradient?&#92;u003c/span&#92;u003e&#92;u003c/span&#92;u003e&quot;' data-options='[&quot;MNIST&quot;,&quot;CIFAR-10&quot;,&quot;Both&quot;,&quot;Neither&quot;]' data-inline='false' data-disabled='false'></marimo-radio></marimo-ui-element><marimo-ui-element object-id='ROlb-1' random-id='e219ca86-d6de-4a30-1e8f-d4c886874b1e'><marimo-checkbox data-initial-value='false' data-label='&quot;&#92;u003cspan class=&#92;&quot;markdown prose dark:prose-invert contents&#92;&quot;&#92;u003e&#92;u003cspan class=&#92;&quot;paragraph&#92;&quot;&#92;u003eReveal the ablation&#92;u003c/span&#92;u003e&#92;u003c/span&#92;u003e&quot;' data-disabled='false'></marimo-checkbox></marimo-ui-element></div>"
+            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='ROlb-0' random-id='60523ffa-ab08-7c77-7666-f1bcd47ba227'><marimo-radio data-initial-value='null' data-label='&quot;&#92;u003cspan class=&#92;&quot;markdown prose dark:prose-invert contents&#92;&quot;&#92;u003e&#92;u003cspan class=&#92;&quot;paragraph&#92;&quot;&#92;u003eWhich dataset is sensitive to the stop-gradient?&#92;u003c/span&#92;u003e&#92;u003c/span&#92;u003e&quot;' data-options='[&quot;MNIST&quot;,&quot;CIFAR-10&quot;,&quot;Both&quot;,&quot;Neither&quot;]' data-inline='false' data-disabled='false'></marimo-radio></marimo-ui-element><marimo-ui-element object-id='ROlb-1' random-id='8ba9f058-2c8e-8bf5-607c-5cf78c3e2cf7'><marimo-checkbox data-initial-value='false' data-label='&quot;&#92;u003cspan class=&#92;&quot;markdown prose dark:prose-invert contents&#92;&quot;&#92;u003e&#92;u003cspan class=&#92;&quot;paragraph&#92;&quot;&#92;u003eReveal the ablation&#92;u003c/span&#92;u003e&#92;u003c/span&#92;u003e&quot;' data-disabled='false'></marimo-checkbox></marimo-ui-element></div>"
           }
         }
       ],
@@ -228,7 +228,7 @@
     },
     {
       "id": "qnkX",
-      "code_hash": "1b3cd728f3c386b2158bef694f594667",
+      "code_hash": "76fe648f68212ae5264c662aa17529ac",
       "outputs": [
         {
           "type": "data",
@@ -241,7 +241,20 @@
     },
     {
       "id": "TqIu",
-      "code_hash": "6c1965d1c4be554e4ca0d8401c141058",
+      "code_hash": "50d8adccc257b7cf82ed6af9bb821d2d",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "Vxnm",
+      "code_hash": "1ccbd3d720b9048156267f1d0e6d43aa",
       "outputs": [
         {
           "type": "data",
@@ -253,7 +266,7 @@
       "console": []
     },
     {
-      "id": "Vxnm",
+      "id": "DnEU",
       "code_hash": "955427d833073e3e2b508a63cd887e33",
       "outputs": [
         {
@@ -266,7 +279,7 @@
       "console": []
     },
     {
-      "id": "DnEU",
+      "id": "ulZA",
       "code_hash": "29b6cef684e303e23e94903b5d289bbe",
       "outputs": [
         {
@@ -279,7 +292,7 @@
       "console": []
     },
     {
-      "id": "ulZA",
+      "id": "ecfG",
       "code_hash": "f7d3e2487fe24184e474df184590b6bd",
       "outputs": [
         {
@@ -292,7 +305,7 @@
       "console": []
     },
     {
-      "id": "ecfG",
+      "id": "Pvdt",
       "code_hash": "40da073cdffdf4c1a1d84038fe4a4c83",
       "outputs": [
         {
@@ -305,7 +318,7 @@
       "console": []
     },
     {
-      "id": "Pvdt",
+      "id": "ZBYS",
       "code_hash": "b79f0159e99c8a5ae83bb3cca35e2f3c",
       "outputs": [
         {
@@ -318,7 +331,7 @@
       "console": []
     },
     {
-      "id": "ZBYS",
+      "id": "aLJB",
       "code_hash": "befb5f623b082622c00df0a8abe92c17",
       "outputs": [
         {
@@ -331,7 +344,7 @@
       "console": []
     },
     {
-      "id": "aLJB",
+      "id": "nHfw",
       "code_hash": "8011fc56ca78df0227902757c15e7e05",
       "outputs": [
         {
@@ -344,20 +357,20 @@
       "console": []
     },
     {
-      "id": "nHfw",
+      "id": "xXTn",
       "code_hash": "7babce3ee24bb23eae54d9f9f000b9a9",
       "outputs": [
         {
           "type": "data",
           "data": {
-            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='aLJB-0' random-id='77d1735a-db17-2967-9516-f49dca6fcd8b'><marimo-radio data-initial-value='&quot;3. both&quot;' data-label='&quot;&#92;u003cspan class=&#92;&quot;markdown prose dark:prose-invert contents&#92;&quot;&#92;u003e&#92;u003cspan class=&#92;&quot;paragraph&#92;&quot;&#92;u003eBuild the synthesis&#92;u003c/span&#92;u003e&#92;u003c/span&#92;u003e&quot;' data-options='[&quot;1. units&quot;,&quot;2. timing&quot;,&quot;3. both&quot;]' data-inline='true' data-disabled='false'></marimo-radio></marimo-ui-element><div class=\"mechanism-grid\"><div class=\"mechanism-card\">\n        <div class=\"mechanism-kicker\">CIFAR-10 \u00b7 units</div>\n        <svg class=\"mechanism-svg\" viewBox=\"0 0 280 150\"\n             role=\"img\"\n             aria-label=\"Hidden activations shrink while the classifier grows\">\n          <defs>\n            <marker id=\"mech-arrow\" viewBox=\"0 0 10 10\" refX=\"9\"\n                    refY=\"5\" markerWidth=\"5\" markerHeight=\"5\"\n                    orient=\"auto\">\n              <path d=\"M0,0 L10,5 L0,10 z\" fill=\"#a8a29e\"/>\n            </marker>\n          </defs>\n          <text x=\"44\" y=\"16\" text-anchor=\"middle\" font-size=\"10\"\n                fill=\"#78716c\">AW 0</text>\n          <text x=\"200\" y=\"16\" text-anchor=\"middle\" font-size=\"10\"\n                fill=\"#78716c\">AW 2</text>\n          <g opacity=\"0.85\">\n            <circle cx=\"30\" cy=\"50\" r=\"3.2\" fill=\"#1d4ed8\"/>\n            <circle cx=\"42\" cy=\"46\" r=\"3.2\" fill=\"#1d4ed8\"/>\n            <circle cx=\"52\" cy=\"56\" r=\"3.2\" fill=\"#1d4ed8\"/>\n            <circle cx=\"34\" cy=\"70\" r=\"3.2\" fill=\"#b45309\"/>\n            <circle cx=\"46\" cy=\"68\" r=\"3.2\" fill=\"#b45309\"/>\n            <circle cx=\"58\" cy=\"74\" r=\"3.2\" fill=\"#b45309\"/>\n            <circle cx=\"32\" cy=\"90\" r=\"3.2\" fill=\"#047857\"/>\n            <circle cx=\"44\" cy=\"92\" r=\"3.2\" fill=\"#047857\"/>\n            <circle cx=\"56\" cy=\"88\" r=\"3.2\" fill=\"#047857\"/>\n            <circle cx=\"192\" cy=\"64\" r=\"3.2\" fill=\"#1d4ed8\"/>\n            <circle cx=\"199\" cy=\"62\" r=\"3.2\" fill=\"#1d4ed8\"/>\n            <circle cx=\"206\" cy=\"68\" r=\"3.2\" fill=\"#1d4ed8\"/>\n            <circle cx=\"194\" cy=\"76\" r=\"3.2\" fill=\"#b45309\"/>\n            <circle cx=\"201\" cy=\"74\" r=\"3.2\" fill=\"#b45309\"/>\n            <circle cx=\"208\" cy=\"80\" r=\"3.2\" fill=\"#b45309\"/>\n            <circle cx=\"192\" cy=\"88\" r=\"3.2\" fill=\"#047857\"/>\n            <circle cx=\"199\" cy=\"90\" r=\"3.2\" fill=\"#047857\"/>\n            <circle cx=\"206\" cy=\"86\" r=\"3.2\" fill=\"#047857\"/>\n          </g>\n          <line x1=\"95\" y1=\"80\" x2=\"135\" y2=\"80\" stroke=\"#a8a29e\"\n                stroke-width=\"1.5\" marker-end=\"url(#mech-arrow)\"/>\n          <text x=\"115\" y=\"70\" text-anchor=\"middle\" font-size=\"9\"\n                fill=\"#78716c\">AW \u2191</text>\n          <rect x=\"30\" y=\"118\" width=\"40\" height=\"8\" rx=\"3\"\n                fill=\"#b45309\" opacity=\"0.8\"/>\n          <rect x=\"176\" y=\"118\" width=\"60\" height=\"8\" rx=\"3\"\n                fill=\"#b45309\" opacity=\"0.8\"/>\n          <text x=\"50\" y=\"140\" text-anchor=\"middle\" font-size=\"9\"\n                fill=\"#78716c\">|W| small</text>\n          <text x=\"206\" y=\"140\" text-anchor=\"middle\" font-size=\"9\"\n                fill=\"#78716c\">|W| grows</text>\n        </svg>\n        <p class=\"mechanism-text\"><strong>SD / |W| stays flat.</strong>\n        The activations shrink and the classifier grows to keep the\n        logits fixed. The wider SD is a units change, not a new\n        complexity.</p>\n      </div><div class=\"mechanism-card\">\n        <div class=\"mechanism-kicker\">IMDB \u00b7 timing</div>\n        <svg class=\"mechanism-svg\" viewBox=\"0 0 280 150\"\n             role=\"img\"\n             aria-label=\"Self-model gradient share falls to two percent by epoch twenty\">\n          <line x1=\"28\" y1=\"120\" x2=\"260\" y2=\"120\" stroke=\"#d6d3d1\"/>\n          <line x1=\"28\" y1=\"120\" x2=\"28\" y2=\"30\" stroke=\"#d6d3d1\"/>\n          <line x1=\"28\" y1=\"111\" x2=\"260\" y2=\"111\" stroke=\"#d6d3d1\"\n                stroke-dasharray=\"4 4\"/>\n          <text x=\"250\" y=\"107\" text-anchor=\"end\" font-size=\"9\"\n                fill=\"#a8a29e\">2%</text>\n          <polyline points=\"28,39 49,52 70,84 91,102 112,111 154,111 196,111 238,111\"\n                    fill=\"none\" stroke=\"#b45309\" stroke-width=\"3\"\n                    stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n          <circle cx=\"112\" cy=\"111\" r=\"3.5\" fill=\"#b45309\"/>\n          <text x=\"120\" y=\"96\" font-size=\"9\" fill=\"#78716c\">pressure dies</text>\n          <text x=\"28\" y=\"24\" font-size=\"9\" fill=\"#78716c\">self-model share</text>\n          <text x=\"28\" y=\"136\" font-size=\"9\" fill=\"#a8a29e\">0</text>\n          <text x=\"112\" y=\"136\" text-anchor=\"middle\" font-size=\"9\"\n                fill=\"#a8a29e\">20</text>\n          <text x=\"196\" y=\"136\" text-anchor=\"middle\" font-size=\"9\"\n                fill=\"#a8a29e\">40</text>\n          <text x=\"260\" y=\"136\" text-anchor=\"end\" font-size=\"9\"\n                fill=\"#a8a29e\">epoch</text>\n        </svg>\n        <p class=\"mechanism-text\"><strong>The pressure dies.</strong>\n        The self-model share of the hidden-layer gradient falls to\n        about 2% by epoch 20. Slow the head down and the effect comes\n        back.</p>\n      </div></div></div>"
+            "text/html": "<div style='display: flex;flex: 1;flex-direction: column;justify-content: flex-start;align-items: normal;flex-wrap: nowrap;gap: 0.5rem'><marimo-ui-element object-id='nHfw-0' random-id='fe69b90c-80f2-05f9-d95d-0ef20de3a4af'><marimo-radio data-initial-value='&quot;3. both&quot;' data-label='&quot;&#92;u003cspan class=&#92;&quot;markdown prose dark:prose-invert contents&#92;&quot;&#92;u003e&#92;u003cspan class=&#92;&quot;paragraph&#92;&quot;&#92;u003eBuild the synthesis&#92;u003c/span&#92;u003e&#92;u003c/span&#92;u003e&quot;' data-options='[&quot;1. units&quot;,&quot;2. timing&quot;,&quot;3. both&quot;]' data-inline='true' data-disabled='false'></marimo-radio></marimo-ui-element><div class=\"mechanism-grid\"><div class=\"mechanism-card\">\n        <div class=\"mechanism-kicker\">CIFAR-10 \u00b7 units</div>\n        <svg class=\"mechanism-svg\" viewBox=\"0 0 280 150\"\n             role=\"img\"\n             aria-label=\"Hidden activations shrink while the classifier grows\">\n          <defs>\n            <marker id=\"mech-arrow\" viewBox=\"0 0 10 10\" refX=\"9\"\n                    refY=\"5\" markerWidth=\"5\" markerHeight=\"5\"\n                    orient=\"auto\">\n              <path d=\"M0,0 L10,5 L0,10 z\" fill=\"#a8a29e\"/>\n            </marker>\n          </defs>\n          <text x=\"44\" y=\"16\" text-anchor=\"middle\" font-size=\"10\"\n                fill=\"#78716c\">AW 0</text>\n          <text x=\"200\" y=\"16\" text-anchor=\"middle\" font-size=\"10\"\n                fill=\"#78716c\">AW 2</text>\n          <g opacity=\"0.85\">\n            <circle cx=\"30\" cy=\"50\" r=\"3.2\" fill=\"#1d4ed8\"/>\n            <circle cx=\"42\" cy=\"46\" r=\"3.2\" fill=\"#1d4ed8\"/>\n            <circle cx=\"52\" cy=\"56\" r=\"3.2\" fill=\"#1d4ed8\"/>\n            <circle cx=\"34\" cy=\"70\" r=\"3.2\" fill=\"#b45309\"/>\n            <circle cx=\"46\" cy=\"68\" r=\"3.2\" fill=\"#b45309\"/>\n            <circle cx=\"58\" cy=\"74\" r=\"3.2\" fill=\"#b45309\"/>\n            <circle cx=\"32\" cy=\"90\" r=\"3.2\" fill=\"#047857\"/>\n            <circle cx=\"44\" cy=\"92\" r=\"3.2\" fill=\"#047857\"/>\n            <circle cx=\"56\" cy=\"88\" r=\"3.2\" fill=\"#047857\"/>\n            <circle cx=\"192\" cy=\"64\" r=\"3.2\" fill=\"#1d4ed8\"/>\n            <circle cx=\"199\" cy=\"62\" r=\"3.2\" fill=\"#1d4ed8\"/>\n            <circle cx=\"206\" cy=\"68\" r=\"3.2\" fill=\"#1d4ed8\"/>\n            <circle cx=\"194\" cy=\"76\" r=\"3.2\" fill=\"#b45309\"/>\n            <circle cx=\"201\" cy=\"74\" r=\"3.2\" fill=\"#b45309\"/>\n            <circle cx=\"208\" cy=\"80\" r=\"3.2\" fill=\"#b45309\"/>\n            <circle cx=\"192\" cy=\"88\" r=\"3.2\" fill=\"#047857\"/>\n            <circle cx=\"199\" cy=\"90\" r=\"3.2\" fill=\"#047857\"/>\n            <circle cx=\"206\" cy=\"86\" r=\"3.2\" fill=\"#047857\"/>\n          </g>\n          <line x1=\"95\" y1=\"80\" x2=\"135\" y2=\"80\" stroke=\"#a8a29e\"\n                stroke-width=\"1.5\" marker-end=\"url(#mech-arrow)\"/>\n          <text x=\"115\" y=\"70\" text-anchor=\"middle\" font-size=\"9\"\n                fill=\"#78716c\">AW \u2191</text>\n          <rect x=\"30\" y=\"118\" width=\"40\" height=\"8\" rx=\"3\"\n                fill=\"#b45309\" opacity=\"0.8\"/>\n          <rect x=\"176\" y=\"118\" width=\"60\" height=\"8\" rx=\"3\"\n                fill=\"#b45309\" opacity=\"0.8\"/>\n          <text x=\"50\" y=\"140\" text-anchor=\"middle\" font-size=\"9\"\n                fill=\"#78716c\">|W| small</text>\n          <text x=\"206\" y=\"140\" text-anchor=\"middle\" font-size=\"9\"\n                fill=\"#78716c\">|W| grows</text>\n        </svg>\n        <p class=\"mechanism-text\"><strong>SD / |W| stays flat.</strong>\n        The activations shrink and the classifier grows to keep the\n        logits fixed. The wider SD is a units change, not a new\n        complexity.</p>\n      </div><div class=\"mechanism-card\">\n        <div class=\"mechanism-kicker\">IMDB \u00b7 timing</div>\n        <svg class=\"mechanism-svg\" viewBox=\"0 0 280 150\"\n             role=\"img\"\n             aria-label=\"Self-model gradient share falls to two percent by epoch twenty\">\n          <line x1=\"28\" y1=\"120\" x2=\"260\" y2=\"120\" stroke=\"#d6d3d1\"/>\n          <line x1=\"28\" y1=\"120\" x2=\"28\" y2=\"30\" stroke=\"#d6d3d1\"/>\n          <line x1=\"28\" y1=\"111\" x2=\"260\" y2=\"111\" stroke=\"#d6d3d1\"\n                stroke-dasharray=\"4 4\"/>\n          <text x=\"250\" y=\"107\" text-anchor=\"end\" font-size=\"9\"\n                fill=\"#a8a29e\">2%</text>\n          <polyline points=\"28,39 49,52 70,84 91,102 112,111 154,111 196,111 238,111\"\n                    fill=\"none\" stroke=\"#b45309\" stroke-width=\"3\"\n                    stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n          <circle cx=\"112\" cy=\"111\" r=\"3.5\" fill=\"#b45309\"/>\n          <text x=\"120\" y=\"96\" font-size=\"9\" fill=\"#78716c\">pressure dies</text>\n          <text x=\"28\" y=\"24\" font-size=\"9\" fill=\"#78716c\">self-model share</text>\n          <text x=\"28\" y=\"136\" font-size=\"9\" fill=\"#a8a29e\">0</text>\n          <text x=\"112\" y=\"136\" text-anchor=\"middle\" font-size=\"9\"\n                fill=\"#a8a29e\">20</text>\n          <text x=\"196\" y=\"136\" text-anchor=\"middle\" font-size=\"9\"\n                fill=\"#a8a29e\">40</text>\n          <text x=\"260\" y=\"136\" text-anchor=\"end\" font-size=\"9\"\n                fill=\"#a8a29e\">epoch</text>\n        </svg>\n        <p class=\"mechanism-text\"><strong>The pressure dies.</strong>\n        The self-model share of the hidden-layer gradient falls to\n        about 2% by epoch 20. Slow the head down and the effect comes\n        back.</p>\n      </div></div></div>"
           }
         }
       ],
       "console": []
     },
     {
-      "id": "xXTn",
+      "id": "AjVT",
       "code_hash": "e1f67dd0b07ff0ce989602bd880a7de3",
       "outputs": [
         {
@@ -370,7 +383,7 @@
       "console": []
     },
     {
-      "id": "AjVT",
+      "id": "pHFh",
       "code_hash": "34b42caf482542693141144b47079ee2",
       "outputs": [
         {
@@ -383,7 +396,7 @@
       "console": []
     },
     {
-      "id": "pHFh",
+      "id": "NCOB",
       "code_hash": "de3a3741c53d01ed1f50780b03ab414c",
       "outputs": [
         {
@@ -396,7 +409,7 @@
       "console": []
     },
     {
-      "id": "NCOB",
+      "id": "aqbW",
       "code_hash": "54d9fc40350d6bb6488eb04a870be90b",
       "outputs": [
         {
@@ -409,7 +422,7 @@
       "console": []
     },
     {
-      "id": "aqbW",
+      "id": "TRpd",
       "code_hash": "0f84517697031aa1b02397922921fd58",
       "outputs": [
         {
@@ -422,7 +435,7 @@
       "console": []
     },
     {
-      "id": "TRpd",
+      "id": "TXez",
       "code_hash": "5503836614b8b926eb6bf2768dfc402e",
       "outputs": [
         {
@@ -435,7 +448,7 @@
       "console": []
     },
     {
-      "id": "TXez",
+      "id": "dNNg",
       "code_hash": "c2897895c1f3ca45228d6fa77989c75b",
       "outputs": [
         {
@@ -448,7 +461,7 @@
       "console": []
     },
     {
-      "id": "dNNg",
+      "id": "yCnT",
       "code_hash": "a94b3fb1debc582279eab42d07ea94d3",
       "outputs": [
         {
@@ -461,7 +474,7 @@
       "console": []
     },
     {
-      "id": "yCnT",
+      "id": "wlCL",
       "code_hash": "c2a5b9e7e2e3fa475e989d609f814de3",
       "outputs": [
         {
@@ -474,7 +487,7 @@
       "console": []
     },
     {
-      "id": "wlCL",
+      "id": "kqZH",
       "code_hash": "aaee28ade067d84bfa07d19b0aceafa9",
       "outputs": [
         {
@@ -487,7 +500,7 @@
       "console": []
     },
     {
-      "id": "kqZH",
+      "id": "wAgl",
       "code_hash": "7a2aa2404f46b82005c0a5472b269d31",
       "outputs": [
         {

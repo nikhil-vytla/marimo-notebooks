@@ -421,7 +421,7 @@ def _(mo):
           </div>
           <div class="verdict-card no">
             <div class="verdict-kicker">CIFAR-10 · Figure 3A</div>
-            <div class="verdict-number">0.0252 → 0.0292</div>
+            <div class="verdict-number">0.0573 → 0.0745</div>
             <div class="verdict-note">
               The ordering inverts: the baseline is the narrowest curve.
               Accuracy still matches.
@@ -445,10 +445,10 @@ def _(mo):
 def _(mo):
     mo.md(r"""
     <p class="figure-caption">Figure 1. Three panels, three verdicts.
-    MNIST and CIFAR numbers are the epoch-50 classifier weight SD; IMDB
-    is the weight SD at the end of training. Sources:
-    <code>mnist_detach_ablation.json</code>,
-    <code>cifar_fig3_probes.json</code>, <code>imdb_fig4.json</code>.</p>
+    MNIST is the epoch-50 classifier weight SD. CIFAR is the epoch-250
+    mean over 10 seeds. IMDB is the weight SD at the end of training.
+    Sources: <code>mnist_detach_ablation.json</code>,
+    <code>cifar_fig3.json</code>, <code>imdb_fig4.json</code>.</p>
     """)
     return
 
@@ -1168,6 +1168,14 @@ def _(json, mo, pd):
             / "cifar_fig3_probes.json"
         ).read_text()
     )
+    CIFAR_FIG3 = json.loads(
+        (
+            mo.notebook_location()
+            / "public"
+            / "data"
+            / "cifar_fig3.json"
+        ).read_text()
+    )
     _rows = []
     for _key, _label in (
         ("detach", "detached target"),
@@ -1200,11 +1208,102 @@ def _(json, mo, pd):
                 }
             )
     CIFAR_PROBES = pd.DataFrame(_probe_rows)
-    return CIFAR_PROBES, MNIST_DETACH
+    return CIFAR_FIG3, CIFAR_PROBES, MNIST_DETACH
+
+
+@app.cell(hide_code=True)
+def _(CIFAR_FIG3, alt, mo, pd):
+    _rows = []
+    for _aw, _value in CIFAR_FIG3["results"].items():
+        _rows.append(
+            {
+                "aw": float(_aw),
+                "mean": float(_value["sd_mean"][-1]),
+                "half": float(_value["sd_ci"][-1]),
+            }
+        )
+    _our = pd.DataFrame(_rows).sort_values("aw")
+    _our["lo"] = _our["mean"] - _our["half"]
+    _our["hi"] = _our["mean"] + _our["half"]
+
+    _band = (
+        alt.Chart(_our)
+        .mark_area(opacity=0.15, color="#b45309")
+        .encode(
+            x=alt.X(
+                "aw:Q",
+                title="AW",
+                axis=alt.Axis(values=[0, 0.5, 1, 2]),
+            ),
+            y=alt.Y(
+                "lo:Q",
+                title="classifier SD (epoch 250)",
+                scale=alt.Scale(domain=[0, 0.08]),
+            ),
+            y2="hi:Q",
+        )
+    )
+    _line = (
+        alt.Chart(_our)
+        .mark_line(point=True, color="#b45309", strokeWidth=2)
+        .encode(
+            x=alt.X("aw:Q", title="AW"),
+            y=alt.Y("mean:Q"),
+            tooltip=[
+                alt.Tooltip("aw:Q", title="AW"),
+                alt.Tooltip("mean:Q", format=".4f", title="SD"),
+                alt.Tooltip("half:Q", format=".4f", title="95% CI"),
+            ],
+        )
+    )
+    _label = (
+        alt.Chart(_our.tail(1))
+        .mark_text(align="center", dy=-12, fontSize=10, fontWeight=600, color="#b45309")
+        .encode(x="aw:Q", y="mean:Q", text=alt.value("ours"))
+    )
+    _chart = (_band + _line + _label).properties(width=340, height=380)
+    _paper = mo.image(
+        str(
+            mo.notebook_location()
+            / "public"
+            / "paper_fig3a.png"
+        ),
+        alt="The paper's CIFAR Figure 3A, weight SD against epoch",
+        width="100%",
+        rounded=True,
+    )
+    _fig = mo.hstack(
+        [
+            mo.vstack(
+                [mo.md("**Paper, Figure 3A**"), _paper],
+                gap=0.35,
+            ),
+            mo.vstack(
+                [mo.md("**Ours, 10 seeds**"), _chart],
+                gap=0.35,
+            ),
+        ],
+        widths=[1, 1],
+        gap=1.2,
+        wrap=True,
+    )
+    _caption = mo.md(
+        '<p class="figure-caption">Figure 4. The paper\'s CIFAR panel '
+        'and ours. The paper\'s baseline is the widest curve at epoch '
+        '250. Ours starts at the same absolute scale but rises with AW. '
+        'The ordering is inverted. Both axes start at zero; ours extends '
+        'to 0.08. '
+        'Paper panel reproduced from '
+        'Premakumar et al., 2024, Figure 3A; our curve uses '
+        '<code>cifar_fig3.json</code>, 10 seeds.</p>'
+    )
+    CIFAR_PAPER = mo.vstack([_fig, _caption])
+    return (CIFAR_PAPER,)
 
 
 @app.cell(hide_code=True)
 def _(
+    CIFAR_PAPER,
     CIFAR_PROBES,
     MNIST_DETACH,
     alt,
@@ -1330,84 +1429,6 @@ def _(
     _n2, _n2h, _n2w = _probe("nodetach", 2.0)
     _ratio0 = _b0 / _b0w
     _ratio2 = _b2 / _b2w
-    _sd_pct = (_n2 - _b2) / _b2 * 100.0
-    _hn_pct = (_n2h - _b2h) / _b2h * 100.0
-    _wn_pct = (_n2w - _b2w) / _b2w * 100.0
-    _cifar_df = pd.DataFrame(
-        [
-            {
-                "metric": "SD",
-                "change": _sd_pct,
-                "base": _b2,
-                "nodetach": _n2,
-            },
-            {
-                "metric": "hidden |a|",
-                "change": _hn_pct,
-                "base": _b2h,
-                "nodetach": _n2h,
-            },
-            {
-                "metric": "classifier |W|",
-                "change": _wn_pct,
-                "base": _b2w,
-                "nodetach": _n2w,
-            },
-        ]
-    )
-    _cifar_bars = (
-        alt.Chart(_cifar_df)
-        .mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3)
-        .encode(
-            x=alt.X(
-                "metric:N",
-                sort=["SD", "hidden |a|", "classifier |W|"],
-                title=None,
-                axis=alt.Axis(labelAngle=0),
-            ),
-            y=alt.Y(
-                "change:Q",
-                title="change vs base at AW 2 (%)",
-                scale=alt.Scale(domain=[-22, 4]),
-            ),
-            color=alt.condition(
-                alt.datum.change < 0,
-                alt.value("#b45309"),
-                alt.value("#111827"),
-            ),
-            tooltip=[
-                alt.Tooltip("metric:N"),
-                alt.Tooltip("change:Q", format="+.1f", title="change (%)"),
-                alt.Tooltip("base:Q", format=".4f", title="base"),
-                alt.Tooltip("nodetach:Q", format=".4f", title="no detach"),
-            ],
-        )
-        .properties(width="container", height=220)
-    )
-    _cifar_zero = (
-        alt.Chart(pd.DataFrame({"y": [0]}))
-        .mark_rule(color="#d6d3d1")
-        .encode(y="y:Q")
-    )
-    _cifar_text = (
-        alt.Chart(_cifar_df)
-        .mark_text(dy=12, fontSize=11, color="#57534e")
-        .encode(
-            x=alt.X("metric:N", sort=["SD", "hidden |a|", "classifier |W|"]),
-            y=alt.Y("change:Q"),
-            text=alt.Text("change:Q", format="+.1f"),
-        )
-    )
-    _cifar_chart = _cifar_zero + _cifar_bars + _cifar_text
-    _cifar_caption = mo.md(
-        f'<p class="figure-caption">Figure 4. CIFAR-10 at AW 2. '
-        f'Dropping the stop-gradient moves the SD by {_sd_pct:+.1f}%, the '
-        f'hidden norm by {_hn_pct:+.1f}%, and the classifier norm by '
-        f'{_wn_pct:+.1f}%. The ordering survives: {_n2:.4f} vs '
-        f'{_b2:.4f}, both above {_b0:.4f} at AW 0. Two seeds, 50 epochs; '
-        f'<code>cifar_fig3_probes.json</code>.</p>'
-    )
-
     if guess.value == "mnist":
         _lead = "Right. MNIST is the sensitive one."
         _kind = "success"
@@ -1438,11 +1459,16 @@ def _(
     self-model loss by shrinking the activations, and the classifier
     grows to keep the logits fixed.
 
-    CIFAR is the counterexample. At AW 2, dropping the stop-gradient
-    changes the SD from **{_b2:.4f}** to **{_n2:.4f}** and the hidden
-    norm from **{_b2h:.3f}** to **{_n2h:.3f}**, but the ordering
-    survives. The stop-gradient is essential to the MNIST mechanism and
-    irrelevant to the CIFAR inversion.
+    CIFAR is the counterexample. The paper's panel shows the baseline
+    widest and the self-modeling curves lower. Ours starts at the same
+    absolute scale but rises with AW. The ordering is inverted.
+
+    The stop-gradient is a separate question. In a two-seed, 50-epoch
+    CIFAR probe at AW 0 and 2, dropping it changes the SD from
+    **{_b2:.4f}** to **{_n2:.4f}** and the mean hidden activation from
+    **{_b2h:.3f}** to **{_n2h:.3f}**, but the ordering survives. The
+    stop-gradient is essential to the MNIST mechanism and irrelevant to
+    this CIFAR inversion.
 
     The SD divided by the classifier norm is flat across AW:
     **{_ratio0:.5f}** at AW 0 and **{_ratio2:.5f}** at AW 2. The
@@ -1457,8 +1483,7 @@ def _(
                 _summary,
                 _chart,
                 _fig3_caption,
-                _cifar_chart,
-                _cifar_caption,
+                CIFAR_PAPER,
                 _prose,
             ]
         )
