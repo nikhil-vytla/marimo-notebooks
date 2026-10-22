@@ -1,0 +1,25 @@
+{
+  "config": {
+    "target": "full block-4 map (8192) + hidden (2000)",
+    "epochs": 25,
+    "batch": 512,
+    "lr": 0.0001,
+    "seeds": 1,
+    "device": "mps",
+    "note": "AW0 stopped after epoch 25 and its SD is read from the run log; AW2 completed and wrote the summary. One seed, not the full protocol."
+  },
+  "results": {
+    "none:0": {
+      "aw": 0.0,
+      "sd": 0.01538,
+      "accuracy": null,
+      "n": 1
+    },
+    "none:2": {
+      "aw": 2.0,
+      "sd": 0.014806470833718777,
+      "accuracy": 0.8431,
+      "n": 1
+    }
+  }
+}

@@ -9,6 +9,7 @@ notebooks/*/outputs/
 notebooks/self-modeling/checkpoints/
 .cache/
 .playwright/
+.hf-cache/
 .uv-cache/
 .uv-tools/
 .uv-bin/

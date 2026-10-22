@@ -1832,8 +1832,12 @@ def _(mo):
     That makes our skip tests the wrong hypothesis. The pooled and
     spatial variants did not flip the ordering because the authors'
     code does not contain the extra skip. The real gap is the target
-    definition and the learning rate. We have not yet rerun CIFAR with
-    the code's target.
+    definition and the learning rate.
+
+    A one-seed, 25-epoch pilot at batch 512 with the full target gives
+    **0.01538** at AW 0 and **0.01481** at AW 2. That is the paper's
+    direction. It is one seed, not the full 10-seed protocol. Source:
+    <code>cifar_fulltarget_pilot.json</code>.
 
     | | authors' code | our guided run |
     | --- | --- | --- |
@@ -1894,8 +1898,9 @@ def _(mo):
     the effect is missing; <strong>Partly</strong> means accuracy matches
     but the effect does not. 3A is still no. The authors' code uses a
     larger block-4 target and Adam at `1e-4`; our run used the pooled
-    target and `1e-3`. The exact-target rerun is the next test. Full
-    notes and probes are in the lab notebook.</p>
+    target and `1e-3`. A one-seed pilot at the code target has the
+    right direction; the 10-seed run is pending. Full notes and probes
+    are in the lab notebook.</p>
     """)
     return
 
@@ -1907,10 +1912,10 @@ def _(mo):
 
     Three experiments would change the conclusion:
 
-    - **The authors' CIFAR target.** Rerun at batch 64, Adam `1e-4`,
-      250 epochs, with the full 8192-value block-4 target plus the 2000
-      hidden activations, over 10 seeds. This is the implementation the
-      released code actually uses.
+    - **The authors' CIFAR target.** Complete the 10-seed run at batch
+      64, Adam `1e-4`, 250 epochs, with the full 8192-value block-4
+      target plus the 2000 hidden activations. This is the implementation
+      the released code actually uses.
     - **More seeds for the slow-head control.** Three seeds and 100
       epochs is a sign. Ten seeds and 250 epochs is a measurement.
     - **A rank diagnostic for IMDB.** The hidden layer is 128 units from

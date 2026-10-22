@@ -285,8 +285,9 @@ The frontier, in order of payoff:
    512x4x4 block-4 map (8192 values) plus the 2000 hidden activations as
    the self-model target, with Adam at 1e-4 and batch 64. Our run used
    the pooled 512-vector and 1e-3. The skip tests were a misreading of
-   the prose. Rerun with the code's target before drawing a conclusion
-   about the CIFAR ordering.
+   the prose. A one-seed, 25-epoch pilot at the full target gave 0.01538
+   at AW 0 and 0.01481 at AW 2, the paper's direction. Complete the
+   10-seed, batch-64, 250-epoch run before drawing a conclusion.
 2. **More seeds for the slow-head control.** Three seeds and 100 epochs
    is a sign. Ten seeds and 250 epochs is a measurement. Pre-register
    the read-out before running.

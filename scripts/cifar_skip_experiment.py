@@ -1,3 +1,7 @@
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["torch", "numpy", "datasets", "pillow"]
+# ///
 """CIFAR-10 block-3 skip experiment for the self-modeling essay.
 
 The paper says the hidden layer receives "the output of the fourth
@@ -9,8 +13,11 @@ concatenates block 3 with an upsampled block 4, fuses them with a 1x1
 convolution to 512, then pools. The self-model target is the
 concatenation of the hidden input and the hidden activations.
 
-Both variants failed to flip the CIFAR ordering in the runs saved under
-`notebooks/self-modeling/public/data/cifar_skip.json`.
+Both skip variants failed to flip the CIFAR ordering. The authors'
+released code has no separate block-3 skip and uses a larger target:
+the full 512x4x4 block-4 map plus the 2000 hidden activations. Set
+`CIFAR_SKIP_TARGET=full` (with `CIFAR_SKIP_MODES=none`) to run that
+target. `CIFAR_SKIP_LR=1e-4` matches the released code.
 
 Run on a CUDA machine:
 
@@ -35,7 +42,12 @@ import torch.nn.functional as F
 from datasets import load_dataset
 from torch import nn
 
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+if torch.cuda.is_available():
+    DEVICE = torch.device("cuda")
+elif torch.backends.mps.is_available():
+    DEVICE = torch.device("mps")
+else:
+    DEVICE = torch.device("cpu")
 N_CLASSES = 10
 HIDDEN_WIDTH = 2000
 POOLED4_WIDTH = 512
@@ -91,17 +103,25 @@ class BasicBlock(nn.Module):
 class CifarResNet18Skip(nn.Module):
     """ResNet-18 with an optional pooled block-3 skip into the hidden layer."""
 
-    def __init__(self, skip: str = "none"):
+    def __init__(self, skip: str = "none", target_mode: str = "pooled"):
         super().__init__()
         if skip not in ("none", "block3", "spatial"):
             raise ValueError(f"unknown skip mode {skip!r}")
+        if target_mode not in ("pooled", "full"):
+            raise ValueError(f"unknown target mode {target_mode!r}")
+        if target_mode == "full" and skip != "none":
+            raise ValueError("the full target must use the standard model")
         self.skip = skip
+        self.target_mode = target_mode
         self.input_width = (
             POOLED4_WIDTH + POOLED3_WIDTH
             if skip == "block3"
             else POOLED4_WIDTH
         )
-        self.target_width = self.input_width + HIDDEN_WIDTH
+        self.target_width = (
+            (POOLED4_WIDTH * 4 * 4 if target_mode == "full" else self.input_width)
+            + HIDDEN_WIDTH
+        )
         self.stem = nn.Sequential(
             nn.Conv2d(3, 64, 3, stride=1, padding=1, bias=False),
             nn.BatchNorm2d(64),
@@ -158,14 +178,19 @@ class CifarResNet18Skip(nn.Module):
             else:
                 hidden_input = pooled4
         hidden = F.relu(self.hidden(hidden_input))
-        return hidden_input, hidden
+        return hidden_input, hidden, block4
 
     def forward(
         self, x: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        hidden_input, hidden = self.extract(x)
+        hidden_input, hidden, block4 = self.extract(x)
         out = self.out(hidden)
-        target = torch.cat([hidden_input, hidden], dim=1)
+        if self.target_mode == "full":
+            target = torch.cat(
+                [torch.flatten(block4, 1), hidden], dim=1
+            )
+        else:
+            target = torch.cat([hidden_input, hidden], dim=1)
         return out[:, :N_CLASSES], out[:, N_CLASSES:], target
 
 
@@ -190,11 +215,11 @@ def load_cifar(limit: int | None = None):
 
     x_train, y_train = to_tensors("train", limit)
     x_test, y_test = to_tensors("test", limit)
-    channel_sum = torch.zeros(3, dtype=torch.float64, device=DEVICE)
-    channel_sq = torch.zeros(3, dtype=torch.float64, device=DEVICE)
+    channel_sum = torch.zeros(3, dtype=torch.float64)
+    channel_sq = torch.zeros(3, dtype=torch.float64)
     total = 0
     for lo in range(0, x_train.shape[0], 5000):
-        chunk = x_train[lo:lo + 5000].float().div(255.0)
+        chunk = x_train[lo:lo + 5000].float().div(255.0).cpu()
         channel_sum += chunk.sum(dim=(0, 2, 3)).double()
         channel_sq += chunk.pow(2).sum(dim=(0, 2, 3)).double()
         total += chunk.shape[0] * chunk.shape[2] * chunk.shape[3]
@@ -272,6 +297,8 @@ def train_run(
     seed: int,
     epochs: int,
     batch: int,
+    lr: float,
+    target_mode: str,
     x_train,
     y_train,
     x_test,
@@ -280,7 +307,9 @@ def train_run(
     std,
 ):
     torch.manual_seed(seed)
-    model = CifarResNet18Skip(skip=skip).to(DEVICE)
+    model = CifarResNet18Skip(
+        skip=skip, target_mode=target_mode
+    ).to(DEVICE)
     if DEVICE.type == "cuda":
         model = model.to(memory_format=torch.channels_last)
     if (
@@ -293,7 +322,9 @@ def train_run(
             )
         except RuntimeError as _err:
             print(f"  compile failed, continuing eager: {_err}", flush=True)
-    optimizer = torch.optim.Adam(model.parameters(), lr=LR, fused=DEVICE.type == "cuda")
+    optimizer = torch.optim.Adam(
+        model.parameters(), lr=lr, fused=DEVICE.type == "cuda"
+    )
     use_amp = (
         os.environ.get("CIFAR_SKIP_AMP", "1") == "1"
         and DEVICE.type == "cuda"
@@ -338,6 +369,8 @@ def train_run(
         "seed": int(seed),
         "epochs": int(epochs),
         "batch": int(batch),
+        "lr": float(lr),
+        "target_mode": target_mode,
         "sd": sd_curve,
         "sd_final": sd_curve[-1],
         "accuracy": accuracy,
@@ -349,6 +382,8 @@ def main() -> None:
     smoke = os.environ.get("CIFAR_SKIP_SMOKE") == "1"
     epochs = int(os.environ.get("CIFAR_SKIP_EPOCHS", "2" if smoke else "150"))
     batch = int(os.environ.get("CIFAR_SKIP_BATCH", "512"))
+    lr = float(os.environ.get("CIFAR_SKIP_LR", "1e-3"))
+    target_mode = os.environ.get("CIFAR_SKIP_TARGET", "pooled")
     seeds = int(os.environ.get("CIFAR_SKIP_SEEDS", "1" if smoke else "3"))
     limit = 2000 if smoke else None
     aws = [0.0, 2.0] if smoke else [0.0, 0.5, 1.0, 2.0]
@@ -376,10 +411,19 @@ def main() -> None:
                 row = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            done.add((row["skip"], row["aw"], row["seed"]))
+            done.add(
+                (
+                    row["skip"],
+                    row["aw"],
+                    row["seed"],
+                    row.get("target_mode", "pooled"),
+                    float(row.get("lr", 1e-3)),
+                )
+            )
     print(
-        f"device={DEVICE} epochs={epochs} batch={batch} seeds={seeds} "
-        f"smoke={smoke} done={len(done)}",
+        f"device={DEVICE} epochs={epochs} batch={batch} lr={lr} "
+        f"target={target_mode} seeds={seeds} smoke={smoke} "
+        f"done={len(done)}",
         flush=True,
     )
     x_train, y_train, x_test, y_test, mean, std = load_cifar(limit)
@@ -392,13 +436,13 @@ def main() -> None:
     for skip in modes:
         for aw in aws:
             for seed in range(seeds):
-                key = (skip, float(aw), seed)
+                key = (skip, float(aw), seed, target_mode, lr)
                 if key in done:
                     print(f"skip completed {key}", flush=True)
                     continue
                 print(f"train {key}", flush=True)
                 result = train_run(
-                    skip, aw, seed, epochs, batch,
+                    skip, aw, seed, epochs, batch, lr, target_mode,
                     x_train, y_train, x_test, y_test, mean, std,
                 )
                 with jsonl.open("a") as handle:
@@ -438,10 +482,12 @@ def main() -> None:
             "device_name": (
                 torch.cuda.get_device_name(0)
                 if DEVICE.type == "cuda"
-                else "cpu"
+                else DEVICE.type
             ),
             "epochs": epochs,
             "batch": batch,
+            "lr": lr,
+            "target_mode": target_mode,
             "seeds": seeds,
             "smoke": smoke,
             "limit": limit,
@@ -452,7 +498,11 @@ def main() -> None:
                 "and block4; spatial = concat block3 with upsampled block4, "
                 "then 1x1 conv to 512"
             ),
-            "target": "concat(hidden input, hidden activations)",
+            "target": (
+                "full block-4 map (8192) + hidden (2000)"
+                if target_mode == "full"
+                else "concat(hidden input, hidden activations)"
+            ),
         },
         "results": results,
     }
